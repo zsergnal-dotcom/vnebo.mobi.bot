@@ -857,7 +857,7 @@ namespace vnebo.mobi.bot.Libs
                 foreach (Match match in Regex.Matches(result, "<div><b>(.+?)</b></div>.+?<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">Получить награду!</a>", RegexOptions.Singleline | RegexOptions.Multiline))
                     {
                         if (now.DayOfWeek == DayOfWeek.Sunday && match.Groups[1].Value.Equals("Легкие деньги")) continue;
-                        result = await HelpMethod.Get("/" + match.Groups[2].Value, client);
+                        result = await HelpMethod.Get(match.Groups[2].Value, client);
 
                         if (result.Contains("Награда"))
                         {
@@ -2063,7 +2063,7 @@ namespace vnebo.mobi.bot.Libs
             }
             await SetNoVis(client);
             HelpMethod.StatusLog("Выходим с города...", BotID, Form);
-            url = "/city";
+            url = "/wicket/bookmarkable/ru.overmobile.towers.wicket.pages.guild.GuildPage";
             result = await HelpMethod.Get(url, client);
             url = new Regex("<a class=\"minor nshd tdn\" href=\"(.*?)\">Покинуть город").Match(result).Groups[1].Value;
             result = await HelpMethod.Get(url, client);
