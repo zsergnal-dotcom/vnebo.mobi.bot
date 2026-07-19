@@ -1,0 +1,52 @@
+name: Build and Package
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
+
+    - name: Restore NuGet Packages
+      run: nuget restore vnebo.mobi.bot.sln
+
+    - name: Build Solution
+      run: msbuild vnebo.mobi.bot.sln /p:Configuration=Release /p:Platform="Any CPU"
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: vnebo-mobi-bot-build
+        path: |
+          bin/Release/*.exe
+          bin/Release/*.dll
+          bin/Release/*.config
+        retention-days: 30
+
+    - name: Archive Release
+      if: github.event_name == 'push'
+      run: |
+        $date = Get-Date -Format "yyyyMMdd"
+        Compress-Archive -Path "bin\Release\vnebo.mobi.bot.exe","bin\Release\*.dll","bin\Release\*.config" -DestinationPath "vnebo.mobi.bot-dev-$date.zip"
+      shell: pwsh
+
+    - name: Upload Development Build
+      if: github.event_name == 'push'
+      uses: actions/upload-artifact@v4
+      with:
+        name: vnebo-mobi-bot-dev-package
+        path: vnebo.mobi.bot-dev-*.zip
+        retention-days: 14

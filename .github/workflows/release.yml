@@ -1,0 +1,68 @@
+name: Release and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET Framework
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Restore NuGet packages
+      run: nuget restore vnebo.mobi.bot.sln
+
+    - name: Build solution
+      run: msbuild vnebo.mobi.bot.sln /p:Configuration=Release /p:Platform="Any CPU"
+
+    - name: Create release archive
+      run: |
+        $version = "${{ github.ref_name }}"
+        Compress-Archive -Path "bin\Release\vnebo.mobi.bot.exe","bin\Release\*.dll","bin\Release\*.config" -DestinationPath "vnebo.mobi.bot-$version.zip"
+      shell: pwsh
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: vnebo.mobi.bot-*.zip
+        name: Релиз ${{ github.ref_name }}
+        body: |
+          ## Автоматический релиз ${{ github.ref_name }}
+
+          ### Основные возможности:
+          - Управление до 50 аккаунтов одновременно
+          - Поддержка авторизации через vnebo.mobi, Одноклассники, Mail.ru, Fotostrana
+          - Автоматизация игровых действий
+          - Управление жителями (выселение по времени и цвету)
+          - VIP функции
+
+          ### Системные требования:
+          - Windows 7 или выше
+          - .NET Framework 4.8
+          - Internet Explorer 11
+
+          ### Установка:
+          1. Скачайте архив vnebo.mobi.bot-${{ github.ref_name }}.zip
+          2. Распакуйте в отдельную папку
+          3. Запустите vnebo.mobi.bot.exe
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Create NuGet package
+      run: nuget pack vnebo.mobi.bot.nuspec -Version ${{ github.ref_name }} -OutputDirectory .
+
+    - name: Publish to GitHub Packages
+      run: |
+        nuget sources Add -Name "GitHub" -Source "https://nuget.pkg.github.com/zsergnal-dotcom/index.json" -UserName zsergnal-dotcom -Password ${{ secrets.GITHUB_TOKEN }}
+        nuget push *.nupkg -Source "GitHub" -SkipDuplicate
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
