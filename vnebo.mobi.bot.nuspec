@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+	<id>vnebo.mobi.bot</id>
+	<version>2.1.5</version>
+	<title>Бот для игры Небоскребы (vnebo.mobi)</title>
+	<authors>zsergnal-dotcom</authors>
+	<owners>zsergnal-dotcom</owners>
+	<requireLicenseAcceptance>false</requireLicenseAcceptance>
+	<license type="expression">MIT</license>
+	<projectUrl>https://github.com/zsergnal-dotcom/vnebo.mobi.bot</projectUrl>
+	<description>Автоматизированный бот для мобильной браузерной игры "Небоскребы" (vnebo.mobi). Управление несколькими аккаунтами, автоматизация игровых действий.</description>
+	<summary>Бот для автоматизации игры Небоскребы с поддержкой мультиаккаунтов</summary>
+	<releaseNotes>
+	  Релиз v2.1.5 (19.07.2026)
+	  - Управление до 50 аккаунтов
+	  - Поддержка авторизации через vnebo.mobi, Одноклассники, Mail.ru, Fotostrana
+	  - Автоматизация игровых действий
+	  - Улучшенная система логирования
+	</releaseNotes>
+	<copyright>Copyright 2026</copyright>
+	<tags>vnebo neboskreby bot игра автоматизация multi-account</tags>
+	<repository type="git" url="https://github.com/zsergnal-dotcom/vnebo.mobi.bot" />
+	<dependencies>
+	  <group targetFramework=".NETFramework4.8">
+	  </group>
+	</dependencies>
+  </metadata>
+  <files>
+	<file src="bin\Release\vnebo.mobi.bot.exe" target="tools" />
+	<file src="bin\Release\*.dll" target="tools" />
+	<file src="bin\Release\*.config" target="tools" />
+	<file src="README.md" target="" />
+  </files>
+</package>
