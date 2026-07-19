@@ -106,7 +106,7 @@ namespace vnebo.mobi.bot
                         checkBox.Checked = settings.Read(section_name, checkBox.Tag.ToString()) == "true";
                     }
                 }catch(Exception ex)
-                { Console.WriteLine("ex = "+ex); }
+                { Logger.WriteError("ex = " + ex); }
 
                 try
                 {
@@ -131,7 +131,7 @@ namespace vnebo.mobi.bot
                     }
                 }
                 catch (Exception ex)
-                { Console.WriteLine("ex = " + ex); }
+                { Logger.Write("ex = " + ex); }
 
                 try
                 {
@@ -161,7 +161,7 @@ namespace vnebo.mobi.bot
                     }
                 }
                 catch (Exception ex)
-                { Console.WriteLine("ex = " + ex); }
+                { Logger.WriteError("ex = " + ex); }
 
                 try
             {
@@ -209,7 +209,7 @@ namespace vnebo.mobi.bot
                     }
             }
             catch (Exception ex)
-            { Console.WriteLine("ex list = " + ex); }
+            { Logger.WriteError("ex list = " + ex); }
                 
         }
         
@@ -269,13 +269,13 @@ namespace vnebo.mobi.bot
         private void MoveSelectedItem(ListBox listBox, int direction)
         {
             // Checking selected item
-            //Console.WriteLine($"listBox.SelectedItem={listBox.SelectedItem} listBox.SelectedIndex={listBox.SelectedIndex}");
+            //debug: listBox selection
             if (listBox.SelectedItem == null || listBox.SelectedIndex < 0)
                 return; // No selected item - nothing to do
 
             // Calculate new index using move direction
             int newIndex = listBox.SelectedIndex + direction;
-            //Console.WriteLine($"newIndex={newIndex} ");
+            //debug: newIndex
             // Checking bounds of the range
             if (newIndex < 0 || newIndex >= listBox.Items.Count)
                 return; // Index out of range - nothing to do
@@ -338,9 +338,9 @@ namespace vnebo.mobi.bot
                         txt.ClearSelected();
                     }
                 }
-                }
+            }
             catch (Exception ex)
-            { Console.WriteLine("reset ex = " + ex); }
+            { Logger.Write("reset ex = " + ex); }
         }
 
         private void lift_ot_KeyPress(object sender, KeyPressEventArgs e)

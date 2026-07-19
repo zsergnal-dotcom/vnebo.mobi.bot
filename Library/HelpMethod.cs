@@ -1,6 +1,7 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
@@ -10,6 +11,7 @@ using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Runtime.Serialization.Formatters.Binary;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Windows.Forms;
@@ -19,21 +21,67 @@ namespace vnebo.mobi.bot.Libs
     internal class HelpMethod
     {
         #region DLL IMPORT
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = false)]
+        /// <summary>
+        /// Отправляет сообщение Windows указанному окну.
+        /// </summary>
+        /// <param name="hWnd">Дескриптор окна, которому отправляется сообщение.</param>
+        /// <param name="msg">Код сообщения Windows.</param>
+        /// <param name="wp">Дополнительная информация, зависящая от сообщения (wParam).</param>
+        /// <param name="lp">Дополнительная информация, зависящая от сообщения (lParam).</param>
+        /// <returns>Результат обработки сообщения; значение зависит от отправленного сообщения.</returns>
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wp, IntPtr lp);
 
-        [DllImport("user32.dll", CharSet = CharSet.Auto, SetLastError = false)]
-        public static extern IntPtr SendMessage(IntPtr hWnd, uint Msg, uint wParam, [MarshalAs(UnmanagedType.LPWStr)] string lParam);
+        /// <summary>
+        /// Отправляет сообщение Windows с текстовым параметром указанному окну.
+        /// </summary>
+        /// <param name="hWnd">Дескриптор окна, которому отправляется сообщение.</param>
+        /// <param name="msg">Код сообщения Windows.</param>
+        /// <param name="wParam">Дополнительная информация, зависящая от сообщения (wParam).</param>
+        /// <param name="lParam">Текстовая строка в виде lParam параметра.</param>
+        /// <returns>Результат обработки сообщения; значение зависит от отправленного сообщения.</returns>
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, [MarshalAs(UnmanagedType.LPWStr)] string lParam);
         #endregion
 
         /// <summary>
         /// Инициализированная переменная класса <see cref="Random"/>.
+        /// Используем ThreadLocal для избежания блокировок при параллельном доступе.
         /// </summary>
         public static readonly Random getRandomNumber = new Random();
+        private static readonly ThreadLocal<Random> threadRandom = new ThreadLocal<Random>(() => new Random());
+
+        // Кеш HttpClient и обработчиков по логину чтобы переиспользовать их и снизить накладные расходы
+        public static readonly ConcurrentDictionary<string, HttpClient> _httpClients = new ConcurrentDictionary<string, HttpClient>();
+        public static readonly ConcurrentDictionary<string, HttpClientHandler> _httpHandlers = new ConcurrentDictionary<string, HttpClientHandler>();
+
+        // Компилируемые Regex для частого использования
+        private static readonly Regex LinkRegex = new Regex("<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">(.*?)</a>", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        private static readonly Regex RewardRegex = new Regex("Награда.+?<div class=\"amount\">(.+?)</div>", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        private static readonly Regex ImgGoldRegex = new Regex("<img src=\"/images/icons/mn_gold.png\".*?>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ImgSoldRegex = new Regex("<img src=\"/images/icons/st_sold.png\".*?>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ImgKeyRegex = new Regex("<img src=\"/images/icons/key.png\".*?>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ImgStarFRegex = new Regex("<img src=\"/images/icons/star_f.png\".*?>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex ImgStarRegex = new Regex("<img src=\"/images/icons/star.png\".*?>", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex TagRegex = new Regex(@"<(.|\n)*?>", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.CultureInvariant);
+        private static readonly Regex NewlineRegex = new Regex(@"\r?\n", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex WhitespaceRegex = new Regex(@"\s+", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private static readonly Regex DigitsRegex = new Regex(@"(\d+)", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public static HttpClient HttpManager(string login, HttpClientHandler hand)
         {
-           
+
+            // Попробовать вернуть уже существующий клиент для данного логина
+           /* if (!string.IsNullOrEmpty(login) && _httpClients.TryGetValue(login, out var existingClient))
+            {
+                // Обновим handler cookies если передан handler
+                if (hand != null)
+                {
+                    _httpHandlers.AddOrUpdate(login, hand, (k, old) => hand);
+                }
+                return existingClient;
+            }*/
+
             HttpClient client = new HttpClient(hand)
             {
 
@@ -55,12 +103,17 @@ namespace vnebo.mobi.bot.Libs
                     {
                          hand.CookieContainer = bf.Deserialize(inStr) as CookieContainer;
                         
-                    } catch(Exception ex) { Console.WriteLine("ex des="+ex); }
+                    } catch(Exception ex) { Logger.Write("ex des="+ex); }
                     inStr.Close();
                 }
-                catch (Exception ex) { Console.WriteLine("err open cooc" + ex); }
+                catch (Exception ex) { Logger.Write("err open cooc" + ex); }
             }
-            
+            if (!string.IsNullOrEmpty(login))
+            {
+                _httpHandlers.TryAdd(login, hand);
+                _httpClients.TryAdd(login, client);
+            }
+
             return client;
 
         }
@@ -115,28 +168,9 @@ namespace vnebo.mobi.bot.Libs
             stream.Close();
 
         }
-        internal static string GetEndURI(Uri requestedUri,HttpClient client)
+              public static async Task<string> Get(string url, HttpClient client, CancellationToken cancellationToken = default)
         {
-            try
-            {
-                
-                    client.Timeout = new TimeSpan(0, 0, 5);
-                    using (var response = client.SendAsync(new HttpRequestMessage(HttpMethod.Head, requestedUri)))
-                    {
-                        var result = response.Result;
-                        return result.RequestMessage.RequestUri.ToString();
-                    }
-               
-            }
-            catch (Exception)
-            {
-                // Something went wrong
-                return "";
-            }
-        }
-        public static async Task<string> Get(string url, HttpClient client)
-        {
-            //Console.WriteLine("token=" + MainForm.source.Token.IsCancellationRequested);
+            //debug: token status
             //if (MainForm.source.Token.IsCancellationRequested) { return ""; }
             
             string result;
@@ -145,34 +179,27 @@ namespace vnebo.mobi.bot.Libs
             url = HttpUtility.UrlDecode(url);
             try
             {
-               
-                    await RandomDelay(35, 100);
-               
-               
+                   // await RandomDelay(35, 100);
+
                 do
                 {
-                    //var tmp_res= await client.GetAsync(url).Result;
-                    //res.ResponseUri.AbsoluteUri; 
-                    using (var tmp_res = client.GetAsync( new Uri(client.BaseAddress,url)))
+                    using (var response = await client.GetAsync(new Uri(client.BaseAddress, url), cancellationToken))
                     {
-                        var res = await tmp_res.Result.Content.ReadAsStringAsync();
-                        //result =  res.Content.ReadAsStringAsync().ToString();
+                        var res = await response.Content.ReadAsStringAsync();
 
-                        string baseUrl = tmp_res.Result.RequestMessage.RequestUri.ToString();
+                        string baseUrl = response.RequestMessage.RequestUri.ToString();
                         if (!string.IsNullOrEmpty(baseUrl))
                         {
                             baseUrl = baseUrl.Substring(0, baseUrl.LastIndexOf("/", StringComparison.Ordinal));
                             baseUrl = HttpUtility.UrlDecode(baseUrl);
-                            //result = result.Replace("../../", client.BaseAddress.ToString());
                             res = res.Replace("\"./", "\"" + baseUrl + "/");
                         }
 
-
-                        result =  res+ "<div id=url name="+url+"></div>";
+                        result = res + "<div id=url name=" + url + "></div>";
                     }
-                    
-                    if (result.Contains("Слишком быстро")) { kol++; await RandomDelay(100*kol, 400*kol);
-                        Console.WriteLine("ОСН быстро " + url + " kol = " + kol);
+
+                    if (result.Contains("Слишком быстро")) { kol++; await RandomDelay(100 * kol, 400 * kol);
+                        Logger.Write("ОСН быстро " + url + " kol = " + kol);
                     }
                 }
                 while (result.Contains("Слишком быстро"));
@@ -181,21 +208,21 @@ namespace vnebo.mobi.bot.Libs
             }
             catch (HttpRequestException ex)
             {
-                Console.WriteLine("error get, url = "+url+" request ex = "+ex.InnerException.Message);
+                Logger.Write("error get, url = " + url + " request ex = " + (ex.InnerException?.Message ?? ex.Message));
                 await RandomDelay(100, 200);
-                return Get(url, client).ToString();
+                return await Get(url, client, cancellationToken);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("exep get, url = " + url + " ex = " + ex.Message+" "+ex.StackTrace);
+                Logger.Write("exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace);
                 await RandomDelay(100, 200);
-                return "exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace+" "+ex.InnerException.Message+" "+ex.ToString();// Get(url,client).ToString();
+                return "exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace + " " + (ex.InnerException?.Message ?? "") + " " + ex.ToString();
             }
             return result;
         }
-        public static async Task<string> Get2(string url, HttpClient client, int ot)
+        public static async Task<string> Get2(string url, HttpClient client, int ot, CancellationToken cancellationToken = default)
         {
-            //Console.WriteLine("token=" + MainForm.source.Token.IsCancellationRequested);
+            //debug: token status
             //if (MainForm.source.Token.IsCancellationRequested) { return ""; }
 
             string result;
@@ -205,31 +232,38 @@ namespace vnebo.mobi.bot.Libs
             try
             {
 
-                await RandomDelay(ot, ot+10);
+                //await RandomDelay(ot, ot + 10).ConfigureAwait(false);
 
                 do
                 {
-                    result = await client.GetAsync(url).Result.Content.ReadAsStringAsync();
-                    if (result.Contains("Слишком быстро")) { kol++; await RandomDelay(ot+kol*10, ot + kol * 10+10);
-                        result = await client.GetAsync(url).Result.Content.ReadAsStringAsync();
-                        Console.WriteLine("слишком быстро " + url + " kol = " + kol);
+                    using (var response = await client.GetAsync(url, cancellationToken).ConfigureAwait(false))
+                    {
+                        result = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                     }
-                    
+
+                    if (result.Contains("Слишком быстро")) { kol++; await RandomDelay(ot + kol * 10, ot + kol * 10 + 10).ConfigureAwait(false);
+                        using (var response2 = await client.GetAsync(url, cancellationToken).ConfigureAwait(false))
+                        {
+                            result = await response2.Content.ReadAsStringAsync().ConfigureAwait(false);
+                        }
+                        Logger.Write("слишком быстро " + url + " kol = " + kol);
+                    }
+
                 }
                 while (result.Contains("Слишком быстро"));
 
             }
             catch (HttpRequestException ex)
             {
-                Console.WriteLine("error get, url = " + url + " request ex = " + ex.InnerException.Message);
-                await RandomDelay(100, 200);
-                return Get2(url, client,ot).ToString();
+                Logger.Write("error get, url = " + url + " request ex = " + (ex.InnerException?.Message ?? ex.Message));
+                await RandomDelay(100, 200).ConfigureAwait(false);
+                return await Get2(url, client, ot, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                Console.WriteLine("exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace);
-                await RandomDelay(100, 200);
-                return "exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace + " " + ex.InnerException.Message + " " + ex.ToString();// Get(url,client).ToString();
+                Logger.Write("exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace);
+                await RandomDelay(100, 200).ConfigureAwait(false);
+                return "exep get, url = " + url + " ex = " + ex.Message + " " + ex.StackTrace + " " + (ex.InnerException?.Message ?? "") + " " + ex.ToString();
             }
             return result + "kol="+kol.ToString();
         }
@@ -240,9 +274,9 @@ namespace vnebo.mobi.bot.Libs
             string result;
             HttpContent content = new FormUrlEncodedContent(data);
             HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
-            HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            HttpResponseMessage response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             // result= await response.EnsureSuccessStatusCode().Content.ReadAsStringAsync().Result.ToString;
-            result = await response.Content.ReadAsStringAsync();
+            result = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             return result;
         }
     
@@ -256,7 +290,8 @@ namespace vnebo.mobi.bot.Libs
         /// <returns>Задача, представляющая случайную временную задержку.</returns>
         public static async Task RandomDelay(int Minimum, int Maximum)
         {
-            await Task.Delay(getRandomNumber.Next(Minimum, Maximum + 1));
+            int delay = threadRandom.Value.Next(Minimum, Maximum + 1);
+            await Task.Delay(delay).ConfigureAwait(false);
         }
 
    
@@ -267,7 +302,7 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="PlaceholderText">Текст placeholder.</param>
         public static void SetPlaceholder(TextBox TextBox, string PlaceholderText)
         {
-            SendMessage(TextBox.Handle, 0x1500 + 1, 0, PlaceholderText);
+            SendMessage(TextBox.Handle, 0x1501, IntPtr.Zero, PlaceholderText);
         }
 
         /// <summary>
@@ -309,9 +344,9 @@ namespace vnebo.mobi.bot.Libs
                     registryKey.DeleteValue(fileName);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                MessageBox.Show("Произошла ошибка, автозапуск невозможен.");
+                Logger.Write("AutoRun error: " + ex.Message);
             }
 
             // Закрываем ветку реестра
@@ -321,13 +356,7 @@ namespace vnebo.mobi.bot.Libs
         {
             string ret = "";
             DateTime now = DateTime.UtcNow.AddHours(3);
-            if (url.Length > 0)
-            {
-                string[] parts = url.Split('/'); // или s.Split() - роль разделителей будут играть любые пробельные символы
-                url=url.Replace(parts.Last(), "");
-            }
-            
-            foreach (Match match in Regex.Matches(res, "<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">(.*?)</a>"))
+          foreach (Match match in LinkRegex.Matches(res))
             {
 
                 if (match.Groups[1].Value.Length > 0&& (name.Contains(match.Groups[2].Value)|| match.Groups[2].Value.Contains(name)))
@@ -361,19 +390,19 @@ namespace vnebo.mobi.bot.Libs
         public static string GetNagrada(string result)
         {
 
-            string blok = new Regex("Награда.+?<div class=\"amount\">(.+?)</div>", RegexOptions.Singleline | RegexOptions.Multiline).Match(result).Groups[1].Value;
+            string blok = RewardRegex.Match(result).Groups[1].Value;
             blok = blok.Replace("&#039;", "");
 
-            blok = Regex.Replace(blok, "<img src=\"/images/icons/mn_gold.png\".*?>", "Баксов:");
-            blok = Regex.Replace(blok, "<img src=\"/images/icons/st_sold.png\".*?>", "Монет:");
-            blok = Regex.Replace(blok, "<img src=\"/images/icons/key.png\".*?>", "Ключей:");
-            blok = Regex.Replace(blok, "<img src=\"/images/icons/star_f.png\".*?>", "Звёзд:");
-            blok = Regex.Replace(blok, "<img src=\"/images/icons/star.png\".*?>", "Опыта:");
+            blok = ImgGoldRegex.Replace(blok, "Баксов:");
+            blok = ImgSoldRegex.Replace(blok, "Монет:");
+            blok = ImgKeyRegex.Replace(blok, "Ключей:");
+            blok = ImgStarFRegex.Replace(blok, "Звёзд:");
+            blok = ImgStarRegex.Replace(blok, "Опыта:");
 
-            blok = Regex.Replace(blok, @"<(.|\n)*?>", " ");
-            blok = Regex.Replace(blok, @"\r?\n", " ");
-            blok = Regex.Replace(blok, @"\s+", " ");
-            blok = Regex.Replace(blok, @"(\d+)", "$1\n");
+            blok = TagRegex.Replace(blok, " ");
+            blok = NewlineRegex.Replace(blok, " ");
+            blok = WhitespaceRegex.Replace(blok, " ");
+            blok = DigitsRegex.Replace(blok, "$1\n");
             return blok;
         }
 
@@ -472,7 +501,7 @@ namespace vnebo.mobi.bot.Libs
                     return intStr;
                 }
                 else { return 0; }
-            }catch(Exception ex) { Console.WriteLine("err to int "+ex); return 0; }
+            }catch(Exception ex) { Logger.Write("err to int "+ex); return 0; }
         }
 
         /// <summary>

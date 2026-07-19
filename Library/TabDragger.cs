@@ -148,7 +148,7 @@ namespace vnebo.mobi.bot.Libs
             read_file = read_file.Replace(section1, tmp);
             read_file = read_file.Replace(section2, section1);
             read_file = read_file.Replace(tmp, section2);
-            //Console.WriteLine($"repl {section1}=>{tmp}/n {section2}=>{section1} /n {tmp}=>{section2}");
+            //debug: repl sections
             try
             {
                 TextWriter tw = new StreamWriter(Path);
@@ -157,7 +157,7 @@ namespace vnebo.mobi.bot.Libs
             }
             catch (Exception ex)
             {
-                Console.WriteLine("ex swap sec = " + ex);
+                Logger.Write("ex swap sec = " + ex);
                 throw ex;
             }
             

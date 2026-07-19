@@ -39,13 +39,13 @@ namespace vnebo.mobi.bot
         /// <summary>
         /// Версия приложения.
         /// </summary>
-        private readonly string v = "v2.0";
-        private readonly string d = "08.07.2026";
+        private readonly string v = "v2.1.5";
+        private readonly string d = "19.07.2026";
         /// <summary>
         /// Информация о сайте обновления/файла бота
         /// </summary>
 
-        public static readonly string domen = "http://zserg.press/";
+        public static readonly string domen = "http://31.41.63.106/";
         //public static readonly string name_file = "vnebo.mobi";
         /// <summary>
         /// Текст кнопки "ЗАПУСТИТЬ БОТА".
@@ -86,6 +86,8 @@ namespace vnebo.mobi.bot
         /// </summary>
         private static readonly IniFiles settings = new IniFiles();
         public static readonly Dictionary<string, bool> Start = new Dictionary<string, bool>();
+        // Cancellation token sources per bot to allow cancelling tasks
+        private readonly Dictionary<string, System.Threading.CancellationTokenSource> ctsPerBot = new Dictionary<string, System.Threading.CancellationTokenSource>();
 
         //public static CancellationTokenSource source= new CancellationTokenSource();
 
@@ -536,24 +538,16 @@ namespace vnebo.mobi.bot
                 if (button.Text == BUTTON_TEXT_STOP)
                 {
                     button.Text = BUTTON_TEXT_START;
-                    //source.Cancel();
                     string botID = button.Tag.ToString();
                     Start[botID] = false;
-                    //settings.Write($"USER_{botID}", "START_BOT", "false");
-                   // Console.WriteLine($"Stop task Start[{botID}]={Start[botID]}");
-                    //source[button.Tag.ToString()].Cancel();
-                    //source[button.Tag.ToString()].Token.Register
-                    //source[button.Tag.ToString()].Token.;
-                    //Console.WriteLine("tok=" + token.IsCancellationRequested);
+                    // Остановим задачу: если существует CTS в словаре, отменим
+                    if (ctsPerBot.ContainsKey(botID))
+                    {
+                        try { ctsPerBot[botID].Cancel(); } catch { }
+                        try { ctsPerBot[botID].Dispose(); } catch { }
+                        ctsPerBot.Remove(botID);
+                    }
                     return;
-                }
-                else
-                {
-                   // button.Text = BUTTON_TEXT_STOP;
-                  //  Console.WriteLine("Start task");
-                    
-                    
-                    //CancellationToken.Cancel();
                 }
 
                 // ЗАПУСКАЕМ БОТА
@@ -639,7 +633,7 @@ namespace vnebo.mobi.bot
                         case "open10": await BotEngine.Open10(BotID, this, client, "1"); break;
                         case "cancelColl": await BotEngine.CancelZad(BotID, this, client, "/city/coll"); break;
                         case "cancelVIP": await BotEngine.CancelZad(BotID, this, client, "/lobby"); break;
-                        case "lift": await BotEngine.GetLift(BotID, this, client, 100); break;
+                        case "lift": await BotEngine.GetLift(BotID, this, client, 100, ctsPerBot.ContainsKey(BotID.ToString()) ? ctsPerBot[BotID.ToString()].Token : default); break;
                         case "lift15": await BotEngine.GoLift15(BotID, this, client, 100); break;
                         case "floor": await BotEngine.Build(BotID, this, client); break;
                         case "vis": await BotEngine.SetNoVis(client, true); break;
@@ -672,7 +666,7 @@ namespace vnebo.mobi.bot
                     SettingsForm settingForm = new SettingsForm((int)button.Tag);
                     settingForm.ShowDialog();
                     settings.IniParser();
-                } catch(Exception ex) { Console.WriteLine("err open Sett "+ex); }
+                } catch(Exception ex) { Logger.Write("err open Sett "+ex); }
                 //int botID = (int)tabPage.Tag;
                 //settings.EnumSection($"USER_{botID}");
              };
@@ -688,7 +682,7 @@ namespace vnebo.mobi.bot
                     MsgForm msgForm = new MsgForm(BotID, client);
                     msgForm.ShowDialog();
                 }
-                catch (Exception ex) { Console.WriteLine("err open Sett " + ex); }
+                catch (Exception ex) { Logger.Write("err open Sett " + ex); }
             };
 
             comboBox.SelectionChangeCommitted += (s, e) =>
@@ -723,6 +717,14 @@ namespace vnebo.mobi.bot
             }
             else
             {
+                var botKey = BotID.ToString();
+                if (ctsPerBot.ContainsKey(botKey))
+                {
+                    try { ctsPerBot[botKey].Cancel(); } catch { }
+                    try { ctsPerBot[botKey].Dispose(); } catch { }
+                    ctsPerBot.Remove(botKey);
+                }
+                
                 Invoke((MethodInvoker)delegate
                 {
                     Button.Text = BUTTON_TEXT_START;
@@ -738,14 +740,21 @@ namespace vnebo.mobi.bot
  
         private void BOT_START(int BotID)
         {
-            
-            //CancellationTokenSource s_cts = new CancellationTokenSource();
-
-            /*  if (!source.ContainsKey(BotID.ToString()))
-              {
-                  source.Add(BotID.ToString(), new CancellationTokenSource());
-              }*/
-            //var token = source[BotID.ToString()].Token;
+            // Создаём локальный CancellationTokenSource для этой задачи
+            var cts = new System.Threading.CancellationTokenSource();
+            var token = cts.Token;
+            // Сохраняем CTS, чтобы можно было отменить задачу извне (при нажатии стоп)
+            var botKey = BotID.ToString();
+            if (ctsPerBot.ContainsKey(botKey))
+            {
+                try { ctsPerBot[botKey].Cancel(); } catch { }
+                try { ctsPerBot[botKey].Dispose(); } catch { }
+                ctsPerBot[botKey] = cts;
+            }
+            else
+            {
+                ctsPerBot.Add(botKey, cts);
+            }
             try
             {
                 // Получаем ссылки на компоненты
@@ -792,37 +801,41 @@ namespace vnebo.mobi.bot
                             {
                                 str_no = account_settings["LIST_NO"];
                             }
-                                // Разворачиваем этажи
-                                string url = new Regex("href=\"(.*?expandTowerLink.*?)\">").Match(result).Groups[1].Value;
-                            if (url.Length > 0)
-                            {
-                                await HelpMethod.Get(url, client);
-                            }
+                            
+                            string url;
+                            // Разворачиваем этажи
+                            //string url = new Regex("href=\"(.*?expandTowerLink.*?)\">").Match(result).Groups[1].Value;
+                           // if (url.Length > 0)
+                           // {
+                           //     await HelpMethod.Get(url, client, token);
+                           // }
 
                             // Если включена опция "начинать инвов"
                             if (HelpMethod.ToBoolean(account_settings, "START_INV") && Start[$"{BotID}"] && !str_no.Contains("Начинать инвов"))
                             {
-                                await BotEngine.StartInv(BotID, this, client);
+                                await BotEngine.StartInv(BotID, this, client, token);
                             }
 
                             // Если включена опция "помогать проходить инвов"
                             if (HelpMethod.ToBoolean(account_settings, "HELP_INV") && Start[$"{BotID}"] && !str_no.Contains("Помогать с инвами"))
                             {
-                                await BotEngine.HelpInv(BotID, this, client, !HelpMethod.ToBoolean(account_settings, "NE_INV"));
+                                await BotEngine.HelpInv(BotID, this, client, !HelpMethod.ToBoolean(account_settings, "NE_INV"), token);
                             }
                             //if (goLift.Checked) 
                             // Отмечаем прочитаным сообщения от Игра
                             if (HelpMethod.ToBoolean(account_settings, "READ_MAIL") && Start[$"{BotID}"] && !str_no.Contains("Отмечаем прочитаным сообщения от Игра"))
                             {
-                                string mail = new Regex("a href=\"(mail)\"><img").Match(result).Groups[1].Value;
+                                string mail = new Regex("a href=\"(.{0,60}/mail)\"><img").Match(result).Groups[1].Value;
                                 string txt = "";
-                                if (mail.Length > 0) { txt = await BotEngine.CheckMail(client, true); }
+                                if (mail.Length > 0) { txt = await BotEngine.CheckMail(client, true, all: false, cancellationToken: token); }
                             }
+                           // await BotEngine.CollectFootball(BotID, this, client, token);
+
                             if ( !str_no.Contains("Крутить барабан"))
                             {
                                 if (result.Contains("href=\"baraban\""))
                                 {
-                                    await BotEngine.CollectBaraban(BotID, this, client);
+                                    await BotEngine.CollectBaraban(BotID, this, client, token);
                                 }
                             }
                             if (result.Contains("Стрелы любви</a>"))
@@ -833,7 +846,7 @@ namespace vnebo.mobi.bot
                             string profile_url = new Regex("href=\".*?(tower/id/[0-9]*.?)\"><span>").Match(result).Groups[1].Value;
 
                             // Заносим в переменную ссылку на гостиницу<a class="flhdr" href="./floor/68037603">
-                            string hostel_url = new Regex("<a class=\"flhdr\" href=\"(.{1,20}/floor/[0-9]{1,20})\">.{1,10}<span class=\"\">1. Гостиница</span>", RegexOptions.Singleline).Match(result).Groups[1].Value;
+                            string hostel_url = new Regex("<a class=\"flhdr\" href=\"(.{1,50}/floor/[0-9]{1,20})\">.{1,10}<span class=\"\">1. Гостиница</span>", RegexOptions.Singleline).Match(result).Groups[1].Value;
      
                             // Если есть марафон
                             if (result.Contains("марафон") && Start[$"{BotID}"] && !str_no.Contains("Сдавать/получать задания марафона"))
@@ -852,7 +865,7 @@ namespace vnebo.mobi.bot
                                 // Если в настройках выбрали тратить билеты
                                 if (HelpMethod.ToBoolean(account_settings, "OPEN_LAVKA") && Start[$"{BotID}"])
                                 {
-                                    string tmp_h=await HelpMethod.Get(url_a, client);
+                                string tmp_h=await HelpMethod.Get(url_a, client, token);
                                     url_a= new Regex("<a class=\"flhdr cntr\" href=\"(.*?)\">").Match(tmp_h).Groups[1].Value;
                                    // Console.WriteLine($"url_a={url_a}");
                                     /*TextWriter tw2 = new StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "lavka.html");
@@ -895,7 +908,7 @@ namespace vnebo.mobi.bot
                            /* }
                             catch (OperationCanceledException)
                             {
-                                Console.WriteLine("\nTasks cancelled: timed out.\n");
+                                Logger.Write("Tasks cancelled: timed out.");
                                 HelpMethod.Log("Ошибка вывода статистики: timed out. ", BotID, this);
                             }
                             finally
@@ -905,7 +918,7 @@ namespace vnebo.mobi.bot
                             //Проверяем коллекцию и берем или сдаем ее
                             if (HelpMethod.ToBoolean(account_settings, "OPEN_KOLL") && Start[$"{BotID}"] && !str_no.Contains("Брать/сдавать коллекции"))
                             {
-                                await BotEngine.GetCollection(BotID, this, client);
+                                await BotEngine.GetCollection(BotID, this, client, token);
                             }
 
                             // Покупаем Пиар
@@ -988,7 +1001,7 @@ namespace vnebo.mobi.bot
                                     // Если включена опция "Собирать выручку"
                                     if (HelpMethod.ToBoolean(account_settings, "COLLECT_COIN") && Start[$"{BotID}"])
                                     {
-                                        await BotEngine.CollectCoins(BotID, this, client); // Собираем выручку
+                                        await BotEngine.CollectCoins(BotID, this, client, token); // Собираем выручку
                                     }
 
                                     // Если включена опция "Выкладывать товар"
@@ -1000,13 +1013,13 @@ namespace vnebo.mobi.bot
                                     // Если включена опция "Закупать товар"
                                     if (HelpMethod.ToBoolean(account_settings, "BUY_GOODS") && Start[$"{BotID}"])
                                     {
-                                        await BotEngine.BuyGoods(BotID, this, client); // Закупаем товар 
+                                        await BotEngine.BuyGoods(BotID, this, client, token); // Закупаем товар 
                                     }
 
                                     // Если включена опция "Доставлять посетителей"
                                     if (HelpMethod.ToBoolean(account_settings, "LIFT_UP") && Start[$"{BotID}"] )
                                     {
-                                        await BotEngine.Lift(BotID, this, client,ot);// Лифт
+                                        await BotEngine.Lift(BotID, this, client,ot, token);// Лифт
                                     }
                                 }
                             }
@@ -1053,7 +1066,7 @@ namespace vnebo.mobi.bot
                             {
                                 //Смотрим активные перс.задания и, если есть выполненные, то получаем награду
                                 string tekQuest = await BotEngine.PersQuests(BotID, this, client, true);
-                                string res = await HelpMethod.Get("/quests", client);
+                                string res = await HelpMethod.Get("/quests", client, token);
 
                                 //Если есть настройка звать в лифт при перс.заданиях и не воскресенье
                                 if (tekQuest.Length > 0 && HelpMethod.ToBoolean(account_settings, "GO_LIFT_PERS") && now.DayOfWeek != DayOfWeek.Sunday)// && !res.Contains("Выполнено 7 заданий"))
@@ -1074,7 +1087,7 @@ namespace vnebo.mobi.bot
                                 {
                                     await BotEngine.Cup(BotID, this, client, "/lobby");
                                     await BotEngine.Cup(BotID, this, client, "cup");
-                                    string mypage = await HelpMethod.Get(profile_url, client);
+                                    string mypage = await HelpMethod.Get(profile_url, client, token);
                                     if (mypage.Contains("/cup/tournament"))
                                         await BotEngine.Cup(BotID, this, client, "/cup/tournament");
 
@@ -1086,7 +1099,7 @@ namespace vnebo.mobi.bot
                             //Отменяем неугодные ВИПы
                             if (HelpMethod.ToBoolean(account_settings, "CANCEL_VIP") && Start[$"{BotID}"] && !str_no.Contains("Отменять ВИПку"))
                             {
-                                result= await HelpMethod.Get("/lobby", client);
+                                result= await HelpMethod.Get("/lobby", client, token);
                                 string tekVIP= new Regex("<strong class=\"admin\">(.*?)</strong>").Match(result).Groups[1].Value;
                                 if (account_settings["LIST_VIP"].Contains(tekVIP))
                                     await BotEngine.CancelZad(BotID, this, client, "/lobby");
@@ -1143,10 +1156,10 @@ namespace vnebo.mobi.bot
                             if (!HelpMethod.ToBoolean(account_settings, "GO_LIFT_2"))
                             {
                                 //Сворачиваем этажи
-                                url = new Regex("href=\"(.*?collapseTowerLink.*?)\"><img").Match(result).Groups[1].Value;
+                                url = new Regex("href=\"(.*?collapseTowerLink.*?)\">").Match(result).Groups[1].Value;
                                 if (url.Length > 0)
                                 {
-                                    await HelpMethod.Get(url, client);
+                                    await HelpMethod.Get(url, client, token);
                                 }
                             }
                                 //сохраняем куки
@@ -1226,7 +1239,7 @@ namespace vnebo.mobi.bot
                     
             }
             catch(Exception ex) { 
-                Console.WriteLine("ex = "+ex); HelpMethod.Log("Ошибка запуска бота USER_"+BotID.ToString()+" ",BotID,this);
+                Logger.Write("ex = "+ex); HelpMethod.Log("Ошибка запуска бота USER_"+BotID.ToString()+" ",BotID,this);
                 HelpMethod.Log("Ошибка "+ex, BotID, this);
                 //await BotEngine.Sleep(BotID, button_start, this, 60);
                 BOT_START(BotID); }
@@ -1241,6 +1254,7 @@ namespace vnebo.mobi.bot
                 {
 
                     HttpClient client = HelpMethod.HttpManager();
+                    client.BaseAddress = new Uri(domen);
                     string url = domen + "version.txt";
                     string result = await HelpMethod.Get(url, client);
 
@@ -1457,7 +1471,7 @@ namespace vnebo.mobi.bot
                         {
                             MessageBox.Show("Приложение уже запущено, проверьте трей возле часов", "Сообщение", MessageBoxButtons.OK, MessageBoxIcon.Asterisk);
                             //поиск окна по заголовку
-                                Environment.Exit(0);
+                                Environment.Exit(0); // no-op
                         }
                     }
                 }
@@ -1472,7 +1486,7 @@ namespace vnebo.mobi.bot
                 read_file = File.Exists(settings.Path) ? File.ReadAllText(settings.Path) : "";
             }
             catch(Exception ex){
-                Console.WriteLine("exep read file ini = "+ex);
+                Logger.Write("exep read file ini = "+ex);
                 HelpMethod.Log("Ошибка чтения файла настройки бота!  Бот остановлен", 1, this);
                 read_file = null;
             }
@@ -1601,6 +1615,17 @@ namespace vnebo.mobi.bot
 
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
+            // Отменяем все фоновые задачи
+            try
+            {
+                foreach (var kv in ctsPerBot)
+                {
+                    try { kv.Value.Cancel(); } catch { }
+                    try { kv.Value.Dispose(); } catch { }
+                }
+                ctsPerBot.Clear();
+            }
+            catch { }
             //settings.SaveSettings();
             //settings.SortIni();
             Environment.Exit(0);
@@ -1623,7 +1648,7 @@ namespace vnebo.mobi.bot
                 }
       
             }catch(Exception ex)
-            { Console.WriteLine("ex = "+ex); }
+            { Logger.WriteError("ex = " + ex); }
         }
       
         private void GetBots()

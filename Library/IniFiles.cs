@@ -188,7 +188,7 @@ namespace vnebo.mobi.bot
                         tmpDic.Add(pair.Key, (string)keyPairs[pair]);
                     }
                 }
-            }catch(Exception ex) { Console.WriteLine("ex enum = "+ex); }
+            }catch(Exception ex) { Logger.WriteError("ex enum = " + ex); }
 
             return tmpDic;*/
         }
@@ -253,20 +253,20 @@ namespace vnebo.mobi.bot
                     groups[currentGroup].Add(line);
                 }
             }
-            if (!groups.ContainsKey(sectionName))
-            {
-                groups[sectionName] = new List<string>
+                if (!groups.ContainsKey(sectionName))
                 {
-                    settingName + "=" + settingValue
-                };
-                Console.WriteLine("Добавили группу " + sectionName + " - " + settingName + "=" + settingValue);
-            }
+                    groups[sectionName] = new List<string>
+                    {
+                        settingName + "=" + settingValue
+                    };
+                    Logger.Write("Добавили группу " + sectionName + " - " + settingName + "=" + settingValue);
+                }
 
 
             // Update the parameter value in the specified group
             if (groups.TryGetValue(sectionName, out var groupLines))
             {
-                Console.WriteLine("Нашли " + sectionName);
+                Logger.Write("Нашли " + sectionName);
                 for (int i = 0; i < groupLines.Count; i++)
                 {
                     if (groupLines[i].StartsWith(settingName + "="))
@@ -282,7 +282,7 @@ namespace vnebo.mobi.bot
                     groupLines.Add(settingName + "=" + settingValue);
                 }
             }
-            Console.WriteLine("Gr=" + sectionName + " - " + settingName + "=" + settingValue);
+            Logger.Write("Gr=" + sectionName + " - " + settingName + "=" + settingValue);
             // Rebuild the lines
             var newLines = new StringBuilder();
             foreach (var group in groups)
@@ -296,7 +296,7 @@ namespace vnebo.mobi.bot
             try { 
             // Write the changes to the file
             File.WriteAllText(Path, newLines.ToString());
-        } catch (Exception ex) { Console.WriteLine("ex write = " + ex); Write(sectionName, settingName, settingValue); }
+                } catch (Exception ex) { Logger.Write("ex write = " + ex); Write(sectionName, settingName, settingValue); }
 
         }
         public void DeleteSection(string sectionName)
@@ -330,7 +330,7 @@ namespace vnebo.mobi.bot
                    string read_file = File.ReadAllText(Path);
                    string Section = new Regex(@"(\[" + sectionName + @"\]\r?\n.+?\r?\n)\[", RegexOptions.Singleline | RegexOptions.Multiline).Match(read_file).Groups[1].Value;
                    //string Section2 = new Regex(@"(\[" + sectionName + @"\]\r?\n.+?\r?\n)[\[|$]",  RegexOptions.Singleline).Match(read_file).Groups[1].Value;
-                   //Console.WriteLine("Sec2="+Section2); 
+                   //debug: Sec2
                    try
                    {
                        if (Section == "") Section = new Regex(@"(\[" + sectionName + @"\]\r?\n.+?\r?\n)$", RegexOptions.Singleline).Match(read_file).Groups[1].Value; 
@@ -339,7 +339,7 @@ namespace vnebo.mobi.bot
                    }
                    catch (Exception ex)
                    {
-                       Console.WriteLine("ex del sec = "+ex);
+                       Logger.WriteError("ex del sec = " + ex);
                        string read_log_file = System.IO.Path.GetTempPath() + $"tmp_log.log";
                        string read_log = "";
                        if (File.Exists(read_log_file))
@@ -419,7 +419,7 @@ namespace vnebo.mobi.bot
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("ex ini save = " + ex);
+                    Logger.Write("ex ini save = " + ex);
                     string lofFile = System.IO.Path.GetTempPath() + $"tmp_log.log";
                     string read_file = "";
                     if (File.Exists(lofFile))
@@ -439,7 +439,7 @@ namespace vnebo.mobi.bot
                       {
                           StreamWriter myWriter = new StreamWriter(myStream);
                           myWriter.Write(strToSave);
-                          Console.WriteLine(strToSave);
+                          Logger.Write(strToSave);
                       }*/
                     if (File.Exists(Path))
                     {
@@ -458,7 +458,7 @@ namespace vnebo.mobi.bot
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("ex saveSett = " + ex);
+                    Logger.Write("ex saveSett = " + ex);
                     string lofFile = System.IO.Path.GetTempPath() + $"tmp_log.log";
                     string read_file = "";
                     if (File.Exists(lofFile))
@@ -501,9 +501,9 @@ namespace vnebo.mobi.bot
                 tw.Write(new_ini);
                 tw.Close();
             }
-            catch (Exception ex)
+                catch (Exception ex)
             {
-                Console.WriteLine("ex sort sec = " + ex);
+                Logger.Write("ex sort sec = " + ex);
                 throw ex;
             }
         }

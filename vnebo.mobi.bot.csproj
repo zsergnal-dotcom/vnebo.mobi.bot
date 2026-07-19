@@ -132,6 +132,7 @@
     </Compile>
     <Compile Include="Library\HelpMethod.cs" />
     <Compile Include="Library\IniFiles.cs" />
+    <Compile Include="Library\Logger.cs" />
     <Compile Include="Library\NativeMethods.cs" />
     <Compile Include="Library\TabDragger.cs" />
     <Compile Include="MainForm.BotClient.cs">

@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
+using System.Security.Policy;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using vnebo.mobi.bot.Properties;
-using System.Runtime.InteropServices;
 using System.Web.UI.WebControls;
-using System.Drawing;
-using System.Linq;
-using System.IO;
+using System.Windows.Forms;
 using vnebo.mobi.bot.Library;
+using vnebo.mobi.bot.Properties;
 
 namespace vnebo.mobi.bot.Libs
 {
@@ -20,6 +21,7 @@ namespace vnebo.mobi.bot.Libs
         const int FEATURE_DISABLE_NAVIGATION_SOUNDS = 21;
         const int SET_FEATURE_ON_PROCESS = 0x00000002;
         const string DEF_PASS = "1qaz@WSX";
+        // Patch: no-op comment to ensure patch context alignment
         [DllImport("urlmon.dll")]
         [PreserveSig]
         [return: MarshalAs(UnmanagedType.Error)]
@@ -110,13 +112,13 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="Login">Логин пользователя.</param>
         /// <param name="Password">Пароль пользователя.</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
-        public static async Task<string> AuthorizationNebo(string Login, string Password, HttpClient client)
+        public static async Task<string> AuthorizationNebo(string Login, string Password, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
                 
                 // Отправляем запрос на страницу логина
-                string result = await HelpMethod.Get("/login", client);
+                string result = await HelpMethod.Get("/login", client, cancellationToken);
                 // Парсим скрытое поле
                 string hidden_input = new Regex("<input type=\"hidden\" name=\"(.*?)\" id=").Match(result).Groups[1].Value;
                 string url = new Regex("action=\"(.*?)\" id=").Match(result).Groups[1].Value;
@@ -136,12 +138,12 @@ namespace vnebo.mobi.bot.Libs
             }
             catch (Exception ex)
             {
-                Console.WriteLine("ex autoriz=" + ex);
+                Logger.Write("ex autoriz=" + ex);
                 return "error";
             }
         }
         [STAThread]
-        public static async Task<string> AuthorizationOK(string Login, string Password, HttpClient client)
+        public static async Task<string> AuthorizationOK(string Login, string Password, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
@@ -210,11 +212,11 @@ namespace vnebo.mobi.bot.Libs
             }
             catch (Exception ex)
             {
-                Console.WriteLine("ex autoriz OK=" + ex);
+                Logger.Write("ex autoriz OK=" + ex);
                 return "error";
             }
         }
-        public static async Task<string> AuthorizationMail(string Login, string Password, HttpClient client)
+        public static async Task<string> AuthorizationMail(string Login, string Password, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
@@ -227,7 +229,7 @@ namespace vnebo.mobi.bot.Libs
                 string url;
                 string res;
                 url = "https://connect.mail.ru/oauth/authorize?client_id=702652&response_type=code&redirect_uri=http://m.my.mail.ru/apps/702652";
-                res = await HelpMethod.Get(url, client);
+                res = await HelpMethod.Get(url, client, cancellationToken);
 
                 string findstr = new Regex("name=\"Page\" value=\"(.*?)\"/>").Match(res).Groups[1].Value.Replace("&amp;", "&");
                 if (findstr.Length > 0) //если требуется авторизация
@@ -248,7 +250,7 @@ namespace vnebo.mobi.bot.Libs
                      HelpMethod.SaveCooc(Login, hand);
                 }
                 url = "https://m.my.mail.ru/apps/702652";
-                res = await HelpMethod.Get(url, client);
+                res = await HelpMethod.Get(url, client, cancellationToken);
 
                 url = "https://m.my.mail.ru/cgi-bin/app/mobile_redirect?app_id=702652";
                 res = await HelpMethod.Get(url, client);
@@ -256,13 +258,13 @@ namespace vnebo.mobi.bot.Libs
             }
             catch (Exception ex)
             {
-                Console.WriteLine("ex autoriz mail=" + ex);
+                Logger.WriteError("ex autoriz mail=" + ex);
                 return "error";
             }
         }
 
 
-        public static async Task<string> AuthorizationFoto(string Login, string Password, HttpClient client)
+        public static async Task<string> AuthorizationFoto(string Login, string Password, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
@@ -313,7 +315,7 @@ namespace vnebo.mobi.bot.Libs
                     {
                         string findstr_img = "https://m.fotostrana.ru" + new Regex("img alt=\"\" src=\"(.*?)\"").Match(res).Groups[1].Value.Replace("&amp;", "&");
                         Confirum Confir = new Confirum("1", "Введите код", "Отправить",findstr_img);
-                        Console.WriteLine(" csr = " + findstr_img);
+                        Logger.Write("csr = " + findstr_img);
                         string code = "";
                         if (Confir.ShowDialog() == DialogResult.OK)
                         {
@@ -329,7 +331,7 @@ namespace vnebo.mobi.bot.Libs
                      { "tk", "" },
                         {"submit","1" }
                 };
-                            Console.WriteLine(" csr = " + findstr+" code = "+code+" login = "+Login+" password = "+Password);
+                            Logger.Write("csr = " + findstr + " code = " + code + " login = " + Login + " password = " + Password);
                             url = "https://m.fotostrana.ru/signup/login/";
                             res = await HelpMethod.Post(url, formData, client);
                            /* TextWriter tw2c = new StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "fs res code.html");
@@ -359,7 +361,7 @@ namespace vnebo.mobi.bot.Libs
             }
             catch (Exception ex)
             {
-                Console.WriteLine("ex autoriz foto=" + ex);
+                Logger.WriteError("ex autoriz foto=" + ex);
                 return "error";
             }
         }
@@ -369,12 +371,12 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task CollectCoins(int BotID, MainFormAll Form, HttpClient client)
+        public static async Task CollectCoins(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Собираем выручку...", BotID, Form, Resources.thinking);
             // Идём на страницу сбора выручки
             string tek_str = "/floors/5";
-            string result = await HelpMethod.Get(tek_str, client);
+            string result = await HelpMethod.Get(tek_str, client, cancellationToken);
 
             // Если есть проданный товар
             if (result.Contains("Собрать выручку!"))
@@ -385,7 +387,7 @@ namespace vnebo.mobi.bot.Libs
                 int floorCount = 0;
 
                 // Запускаем цикл
-                foreach (Match match in Regex.Matches(result, "href=\"(.{40,50}floorPanel.*?)\"", RegexOptions.Singleline | RegexOptions.Multiline))
+                foreach (Match match in Regex.Matches(result, "href=\"(.{40,60}floorPanel.*?)\"", RegexOptions.Singleline | RegexOptions.Multiline))
                 {
                      // Парсим первую ссылку этажа и первый профит с этажа
                     // href="./5?139-1.-floors-0-floorPanel-state-action"
@@ -395,8 +397,9 @@ namespace vnebo.mobi.bot.Libs
 
                     if (floorCount > 200) { break; }
                     // Забираем выручку
-                    result = await HelpMethod.Get(match.Groups[1].Value, client);
-                    if (!MainFormAll.Start[$"{BotID}"]) { return; }
+                    result = await HelpMethod.Get(match.Groups[1].Value, client, cancellationToken);
+                    // cancellationToken check preserved to allow cooperative cancellation
+                    if (cancellationToken.IsCancellationRequested || !MainFormAll.Start[$"{BotID}"]) { return; }
                     floorCount++;
                 }
                 
@@ -407,21 +410,21 @@ namespace vnebo.mobi.bot.Libs
 
 
         }
-        public static async Task CollectBaraban(int BotID, MainFormAll Form, HttpClient client)
+        public static async Task CollectBaraban(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             //HelpMethod.StatusLog("Собираем выручку...", BotID, Form, Resources.thinking);
             // Идём на страницу сбора выручки
-            string result = await HelpMethod.Get("/baraban", client);
+            string result = await HelpMethod.Get("/baraban", client, cancellationToken);
 
             // Если есть проданный товар
             if (result.Contains("baraban/r/1"))
             {
                 HelpMethod.StatusLog("Крутим барабан...", BotID, Form, Resources.thinking);
-                result = await HelpMethod.Get("/baraban/r/1", client);
+                result = await HelpMethod.Get("/baraban/r/1", client, cancellationToken);
                 if (result.Contains("<span>X1</span>"))
                 {
                     string url2 = new Regex("<a class=\"link small m5\" href=\"(.*?)\">").Match(result).Groups[1].Value;
-                    result = await HelpMethod.Get(url2, client);
+                    result = await HelpMethod.Get(url2, client, cancellationToken);
 
                 }
                 // Общая сумма профита и количество этажей на которых собрано
@@ -439,10 +442,10 @@ namespace vnebo.mobi.bot.Libs
                     if (barab > 200) { break; }
                     HelpMethod.StatusLog($"Крутим барабан: {barab}", BotID, Form, Resources.thinking);
                     // Забираем выручку
-                    await HelpMethod.Get(url, client);
+                    await HelpMethod.Get(url, client, cancellationToken);
                     if (!MainFormAll.Start[$"{BotID}"]) { return; }
                     barab++;
-                    result = await HelpMethod.Get("/baraban/r/1", client);
+                    result = await HelpMethod.Get("/baraban/r/1", client, cancellationToken);
                 }
                 while (result.Contains("Достать шар за ")|| result.Contains("Достать 10 шаров за "));
 
@@ -452,18 +455,72 @@ namespace vnebo.mobi.bot.Libs
 
 
         }
+
+        public static async Task CollectFootball(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
+        {
+            //HelpMethod.StatusLog("Собираем выручку...", BotID, Form, Resources.thinking);
+            // Идём на страницу сбора выручки
+            string result = await HelpMethod.Get("/football", client, cancellationToken);
+            int i = 0;
+
+            // Если есть проданный товар
+            if (result.Contains("-buttonsBlock-")|| result.Contains("-getPrizeLink")|| result.Contains("-nextLink"))
+            {
+                Random rnd = new Random();
+                
+        
+                //href="./football?1512-1.-buttonsBlock-leftLink&amp;action=1784445205779">
+                //href="./football?0-25.-buttonsBlock-rightLink&amp;action=1784445205779&amp;action=1784446004916"><img
+                
+                do
+                {
+                    int rl = rnd.Next(1, 3);
+                    string url2 = new Regex("href=\"(.{10,70}-buttonsBlock-.*?)\">.*?href=\"(.{10,70}-buttonsBlock-.*?)\">", RegexOptions.Singleline | RegexOptions.Multiline).Match(result).Groups[rl].Value;
+                    i++;
+                    if (url2.Length > 0) { result = await HelpMethod.Get(url2, client, cancellationToken); } 
+                    //<a href="./football?21-1.-nextLink&amp;p=1&amp;k=2&amp;action=1784448694172">Далее</a>
+                    if(result.Contains("-nextLink"))
+                    {
+                        string url3 = new Regex("<a href=\"(.{10,70}-nextLink.*?)\">").Match(result).Groups[1].Value;
+                        await HelpMethod.Get(url3, client, cancellationToken);
+                        result = await HelpMethod.Get("/football", client, cancellationToken);
+                    }
+                    //<a href="./football?18-1.-getPrizeLink&amp;p=1&amp;k=2&amp;action=1784448352647">Получить награду!</a>
+                    if (result.Contains("-getPrizeLink"))
+                    {
+                        string url3 = new Regex("<a href=\"(.{10,70}-getPrizeLink.*?)\">").Match(result).Groups[1].Value;
+                        await HelpMethod.Get(url3, client, cancellationToken);
+                        result = await HelpMethod.Get("/football", client, cancellationToken);
+                    }
+                    HelpMethod.StatusLog($"Пинаем мячи...{i}", BotID, Form, Resources.thinking);
+
+                } while (result.Contains("-buttonsBlock-") || result.Contains("-getPrizeLink") || result.Contains("-nextLink"));
+                
+                if (result.Contains("<span>X1</span>"))
+                {
+                    string url2 = new Regex("<a class=\"link small m5\" href=\"(.*?)\">").Match(result).Groups[1].Value;
+                    result = await HelpMethod.Get(url2, client, cancellationToken);
+
+                }
+                // Общая сумма профита и количество этажей на которых собрано
+    
+           }
+
+
+        }
+
         /// <summary>
         /// Метод, который берет задания коллекции
         /// </summary>
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task GetCollection(int BotID,  MainFormAll Form, HttpClient client)
+        public static async Task GetCollection(int BotID,  MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Идем в коллекции...", BotID, Form, Resources.thinking);
             string url = "/wicket/bookmarkable/ru.overmobile.towers.wicket.pages.guild.collections.GuildCollectionsPage";
             // Идём на страницу коллекций href="./ru.overmobile.towers.wicket.pages.guild.collections.GuildCollectionsPage"
-            string result = await HelpMethod.Get(url, client);
+            string result = await HelpMethod.Get(url, client, cancellationToken);
                         // Если кнопка получить или сдать коллекцию
             if (result.Contains("Получить награду!") || result.Contains("Получить задание"))
             {
@@ -485,7 +542,7 @@ namespace vnebo.mobi.bot.Libs
             HelpMethod.StatusLog("Проверяем перс.коллекцию...", BotID, Form, Resources.thinking);
             url = "city/coll/my";
             //проверим наличие награды за перс.коллекцию
-            result = await HelpMethod.Get(url, client);
+            result = await HelpMethod.Get(url, client, cancellationToken);
             //пройдемся по всем кнопкам
             result = await HelpMethod.ClickGreenButton(result, "Получить награду",client,url);
             if (result.Length > 0) { HelpMethod.Log("Получили персональную награду за коллекции "+result, BotID, Form); }
@@ -497,33 +554,32 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task StartInv(int BotID, MainFormAll Form, HttpClient client)
+        public static async Task StartInv(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Проверяем инвов...", BotID, Form, Resources.thinking);
-            
-            string result = await HelpMethod.Get("/boss/start", client);
+
+            string result = await HelpMethod.Get("/boss/start", client, cancellationToken);
             result = await HelpMethod.ClickGreenButton(result, "Начать переговоры", client, "/boss/start");
             if (result.Contains("Начать переговоры")) { HelpMethod.Log("Запустили инвов", BotID, Form); }
                
         }
-        static async Task CheckInv(string res, int BotID, HttpClient client, MainFormAll mf)
+        static async Task CheckInv(string res, int BotID, HttpClient client, MainFormAll mf, System.Threading.CancellationToken cancellationToken = default)
         {
-
             if (res.Contains("Начать переговоры")) { await BotEngine.HelpInv(BotID, mf, client, true); }
         }
 
-        public static async Task HelpInv(int BotID, MainFormAll Form, HttpClient client, bool help)
+        public static async Task HelpInv(int BotID, MainFormAll Form, HttpClient client, bool help, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Проверяем запущены ли инвы...", BotID, Form, Resources.thinking);
             string nagr="";
             string tmp;
-            string result = await HelpMethod.Get("/home", client);
+            string result = await HelpMethod.Get("/home", client, cancellationToken);
             result = await HelpMethod.ClickGreenButton(result, "Начать переговоры", client,"/home");
             if (result.Equals("Начать переговоры"))
             {
                 HelpMethod.StatusLog("переходим к инвам ", BotID, Form, Resources.st_sold);
 
-                result = await HelpMethod.Get("/boss", client);
+                result = await HelpMethod.Get("/boss", client, cancellationToken);
                 if (!result.Contains("Осталось <span"))
                 {
                     int i = 0;
@@ -534,7 +590,7 @@ namespace vnebo.mobi.bot.Libs
                         tmp = await HelpMethod.ClickGreenButton(result, "", client,"/boss");
                         if (tmp.StartsWith("Ваша")) nagr = tmp;
                         await HelpMethod.RandomDelay(500,900);
-                        result = await HelpMethod.Get("/boss", client);
+                        result = await HelpMethod.Get("/boss", client, cancellationToken);
                         if (!MainFormAll.Start[$"{BotID}"]) { return; }
                         if (!help) return;
                     } while (!result.Contains("Осталось "));
@@ -549,7 +605,7 @@ namespace vnebo.mobi.bot.Libs
                 // Логируем
                 HelpMethod.Log("Помогли с инвами ", BotID, Form);
             }
-            result = await HelpMethod.Get("/boss", client);
+            result = await HelpMethod.Get("/boss", client, cancellationToken);
             tmp = await HelpMethod.ClickGreenButton(result, "Получить награду!", client, "/boss/start");
             if (tmp.StartsWith("Ваша")) nagr = tmp;
             if(nagr.Length>0) HelpMethod.Log(nagr, BotID, Form);
@@ -560,12 +616,12 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task<bool> GetSund(int BotID, MainFormAll Form, bool nagrada, HttpClient client)
+        public static async Task<bool> GetSund(int BotID, MainFormAll Form, bool nagrada, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Проверяем сундуки...", BotID, Form, Resources.thinking);
             string url = "/city/box/quests";
             // Идём на страницу сундуков
-            string result = await HelpMethod.Get(url, client);
+            string result = await HelpMethod.Get(url, client, cancellationToken);
             if (result.Contains("Получить награду!"))
             {
                 HelpMethod.StatusLog("Получаем награду за сундуки ", BotID, Form, Resources.st_sold);
@@ -598,11 +654,11 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task SellGoods(int BotID, MainFormAll Form, HttpClient client)
+        public static async Task SellGoods(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Анализ ситуации...Выкладываем товар", BotID, Form, Resources.thinking);
             string tek_str = "/floors/3";
-            string result = await HelpMethod.Get(tek_str, client);
+            string result = await HelpMethod.Get(tek_str, client, cancellationToken);
 
             // Если есть доставленный товар
             if (result.Contains("Выложить товар"))
@@ -612,7 +668,7 @@ namespace vnebo.mobi.bot.Libs
                 int floorCount = 0;
 
                 // Запускаем цикл
-                foreach (Match match in Regex.Matches(result, "<a class=\"tdu\" href=\"(.{40,50}floorPanel.*?)\"", RegexOptions.Singleline | RegexOptions.Multiline))
+                foreach (Match match in Regex.Matches(result, "<a class=\"tdu\" href=\"(.{40,60}floorPanel.*?)\"", RegexOptions.Singleline | RegexOptions.Multiline))
                 {
                     // Парсим первую ссылку этажа и первый профит с этажа
                     // href="./5?139-1.-floors-0-floorPanel-state-action"
@@ -622,8 +678,8 @@ namespace vnebo.mobi.bot.Libs
 
                     if (floorCount > 200) { break; }
                     // Забираем выручку
-                    result = await HelpMethod.Get(match.Groups[1].Value, client);
-                    if (!MainFormAll.Start[$"{BotID}"]) { return; }
+                    result = await HelpMethod.Get(match.Groups[1].Value, client, cancellationToken);
+                    if (cancellationToken.IsCancellationRequested || !MainFormAll.Start[$"{BotID}"]) { return; }
                     floorCount++;
                     HelpMethod.StatusLog($"Выкладываем товар... {floorCount}", BotID, Form, Resources.st_stocked);
                 }
@@ -639,13 +695,13 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task BuyGoods(int BotID, MainFormAll Form, HttpClient client)
+        public static async Task BuyGoods(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Анализ ситуации... Закупаем товар", BotID, Form, Resources.thinking);
 
             // Идём на страницу закупки товара
             string tek_str = "/floors/2";
-            string result = await HelpMethod.Get(tek_str, client);
+            string result = await HelpMethod.Get(tek_str, client, cancellationToken);
             await CheckInv(result, BotID, client, Form);
             // Если можно закупить товар
             if (result.Contains("Закупить товар"))
@@ -669,26 +725,26 @@ namespace vnebo.mobi.bot.Libs
                     if (url.Length > 0)
                     {
                         // Переходим на этаж
-                        result = await HelpMethod.Get(url, client);
-                        await CheckInv(result, BotID, client, Form);
+                        result = await HelpMethod.Get(url, client, cancellationToken);
+                        await CheckInv(result, BotID, client, Form, cancellationToken);
                         // Переменная для ссылки на закупку товара
                         string url_purchase=  new Regex("href=\"(.*?floorPanel-product.*?)\"").Match(result).Groups[1].Value;
-
+                        HelpMethod.StatusLog($"Закупаем товар...{i}", BotID, Form, Resources.st_empty_plus);
                         // Проверяем где нужно закупить, приоритет 3 - 2 - 1
                         // href="./121536485?79-1.-floorPanel-productA-emptyState-action-link"
-                       // href = "./121463046?103-1.-floorPanel-productB-emptyState-action-link"
-                    /*    if (result.Contains("productC"))
-                        {
-                            url_purchase = new Regex("wicket:interface=:[0-9]*?:floorPanel:productC:emptyState:action:link::ILinkListener::").Match(result).Value;
-                        }
-                        else if (result.Contains("productB"))
-                        {
-                            url_purchase = new Regex("wicket:interface=:[0-9]*?:floorPanel:productB:emptyState:action:link::ILinkListener::").Match(result).Value;
-                        }
-                        else
-                        {
-                            url_purchase = new Regex("wicket:interface=:[0-9]*?:floorPanel:productA:emptyState:action:link::ILinkListener::").Match(result).Value;
-                        }*/
+                        // href = "./121463046?103-1.-floorPanel-productB-emptyState-action-link"
+                        /*    if (result.Contains("productC"))
+                            {
+                                url_purchase = new Regex("wicket:interface=:[0-9]*?:floorPanel:productC:emptyState:action:link::ILinkListener::").Match(result).Value;
+                            }
+                            else if (result.Contains("productB"))
+                            {
+                                url_purchase = new Regex("wicket:interface=:[0-9]*?:floorPanel:productB:emptyState:action:link::ILinkListener::").Match(result).Value;
+                            }
+                            else
+                            {
+                                url_purchase = new Regex("wicket:interface=:[0-9]*?:floorPanel:productA:emptyState:action:link::ILinkListener::").Match(result).Value;
+                            }*/
 
                         if (url_purchase.Length > 0)
                         {
@@ -696,10 +752,10 @@ namespace vnebo.mobi.bot.Libs
                             floorCount++;
 
                             // Закупаем товар на этаже
-                            result = await HelpMethod.Get($"{url_purchase}", client);
+                            result = await HelpMethod.Get($"{url_purchase}", client, cancellationToken);
                         }
                     }
-                    if (!MainFormAll.Start[$"{BotID}"]) { return; }
+                    if (cancellationToken.IsCancellationRequested || !MainFormAll.Start[$"{BotID}"]) { return; }
                 }
                 while (result.Contains("Закупить товар"));
 
@@ -717,12 +773,12 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task Lift(int BotID, MainFormAll Form, HttpClient client, int ot)
+        public static async Task Lift(int BotID, MainFormAll Form, HttpClient client, int ot, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Анализ ситуации... Идем в лифт", BotID, Form, Resources.thinking);
             
             // Проверяем лифт
-            string result = await HelpMethod.Get("/lift", client);
+            string result = await HelpMethod.Get("/lift", client, cancellationToken);
             await CheckInv(result, BotID,client,Form);
             // Если есть посетители
             if (result.Contains("Поднять лифт")|| result.Contains("Получить чаевые"))
@@ -744,13 +800,14 @@ namespace vnebo.mobi.bot.Libs
                     string url= new Regex("href=\"(.{0,36}lift.*?)\">").Match(result).Groups[1].Value;
                     if (url.Length > 0)
                     {
-                        result = await HelpMethod.Get2(url, client,ot);
-                        await CheckInv(result, BotID, client, Form);
-                        if (result.Contains("<b>Главная</b>")) { result = await HelpMethod.Get("/lift", client); }
+                        result = await HelpMethod.Get2(url, client, ot, cancellationToken);
+                        await CheckInv(result, BotID, client, Form, cancellationToken);
+                        if (result.Contains("<b>Главная</b>")) { result = await HelpMethod.Get("/lift", client, cancellationToken); }
                         if (url.Contains("tipsLink")) { visitors_count++; }
-                        
+
                     }
-                    if (!MainFormAll.Start[$"{BotID}"]) { return; }
+                    // no-op patch: alignment insertion
+                    if (cancellationToken.IsCancellationRequested || !MainFormAll.Start[$"{BotID}"]) { return; }
                 }
                 while (result.Contains("Поднять лифт") || result.Contains("Получить чаевые"));
 
@@ -833,12 +890,12 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="BotID">Идентификатор бота (вкладки).</param>
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-        public static async Task<string> PersQuests(int BotID, MainFormAll Form, HttpClient client, bool go)
+        public static async Task<string> PersQuests(int BotID, MainFormAll Form, HttpClient client, bool go, System.Threading.CancellationToken cancellationToken = default)
         {
             if(go)
             HelpMethod.StatusLog("Заходим в перс.задания...", BotID, Form, Resources.thinking);
             DateTime now = DateTime.UtcNow.AddHours(3);
-            //Console.WriteLine("текущий день недели "+ now.DayOfWeek);
+                //текущий день недели
             // Переходим на страницу заданий
             string result = await HelpMethod.Get("/quests", client); 
 
@@ -898,7 +955,7 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
         /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
         /// <param name="go">true - сдавать задания, false - только посмотреть какие</param>
-        public static async Task<string> CityQuests(int BotID, MainFormAll Form, HttpClient client,bool go)
+        public static async Task<string> CityQuests(int BotID, MainFormAll Form, HttpClient client,bool go, System.Threading.CancellationToken cancellationToken = default)
         {
             
             HelpMethod.StatusLog("заходим в горзадания", BotID, Form, Resources.thinking);
@@ -948,7 +1005,7 @@ namespace vnebo.mobi.bot.Libs
         /// <param name="hostel_evict_less_9">Выселять жителей ниже 9 уровня.</param>
         /// <param name="hostel_evict_minus">Выселять жителей со знаком (-).</param>
         /// <param name="hostel_evict_plus">Выселять жителей со знаком (+).</param>
-        public static async Task HostelEvict(string hostel_url, int BotID, MainFormAll Form,HttpClient client, bool hostel_evict_less_9 = false, bool hostel_evict_minus = false, bool hostel_evict_plus = false)
+        public static async Task HostelEvict(string hostel_url, int BotID, MainFormAll Form,HttpClient client, bool hostel_evict_less_9 = false, bool hostel_evict_minus = false, bool hostel_evict_plus = false, System.Threading.CancellationToken cancellationToken = default)
         {
             if (hostel_url.Length > 0)
             {
@@ -1012,7 +1069,7 @@ namespace vnebo.mobi.bot.Libs
                             {
                                 // Переходим на страницу жителя
                                 result = await HelpMethod.Get(human_url, client);
-                                await CheckInv(result, BotID, client, Form);
+                        await CheckInv(result, BotID, client, Form, cancellationToken);
                                 // Парсим ссылку на выселенения
                                 string evictLink = new Regex("href=\"(.*?)\">Выселить").Match(result).Groups[1].Value.Replace("&amp;", "&");
 
@@ -1020,7 +1077,7 @@ namespace vnebo.mobi.bot.Libs
                                 if (evictLink.Length > 0)
                                 {
                                     // Выселяем жителя
-                                    await HelpMethod.Get("/human/"+evictLink, client);
+                                    await HelpMethod.Get(evictLink, client);
 
                                     // Прибавляем к общему количеству выселенных жителей
                                     human_evict_count++;
@@ -1031,7 +1088,7 @@ namespace vnebo.mobi.bot.Libs
                             {
                                 // Переходим на страницу жителя
                                 result = await HelpMethod.Get(human_url, client);
-                                await CheckInv(result, BotID, client, Form);
+                        await CheckInv(result, BotID, client, Form, cancellationToken);
                                 // Парсим ссылку на выселенения
                                 string evictLink = new Regex("href=\"(.*?)\">Выселить").Match(result).Groups[1].Value.Replace("&amp;", "&");
 
@@ -1039,7 +1096,7 @@ namespace vnebo.mobi.bot.Libs
                                 if (evictLink.Length > 0)
                                 {
                                     // Выселяем жителя
-                                     await HelpMethod.Get($"/human/{evictLink}", client);
+                                     await HelpMethod.Get(evictLink, client);
 
                                     // Прибавляем к общему количеству выселенных жителей
                                     human_evict_count++;
@@ -1050,7 +1107,7 @@ namespace vnebo.mobi.bot.Libs
                             {
                                 // Переходим на страницу жителя
                                 result = await HelpMethod.Get(human_url, client);
-                                await CheckInv(result, BotID, client, Form);
+                                await CheckInv(result, BotID, client, Form, cancellationToken);
                                 // Парсим ссылку на выселенения
                                 string evictLink = new Regex("href=\"(.*?)\">Выселить").Match(result).Groups[1].Value.Replace("&amp;", "&");
 
@@ -1058,7 +1115,7 @@ namespace vnebo.mobi.bot.Libs
                                 if (evictLink.Length > 0)
                                 {
                                     // Выселяем жителя
-                                    _ = await HelpMethod.Get($"/human/{evictLink}", client);
+                                    _ = await HelpMethod.Get(evictLink, client);
 
                                     // Прибавляем к общему количеству выселенных жителей
                                     human_evict_count++;
@@ -1105,7 +1162,7 @@ namespace vnebo.mobi.bot.Libs
             }
         }*/
 
-        public static async Task GoLift15(int BotID, MainFormAll Form, HttpClient client, int ot, int kol=1, bool change=false)
+        public static async Task GoLift15(int BotID, MainFormAll Form, HttpClient client, int ot, int kol=1, bool change=false, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Идем в лифт", BotID, Form, Resources.thinking);
             //развезём имеющихся
@@ -1127,7 +1184,7 @@ namespace vnebo.mobi.bot.Libs
                 if (url.Length > 0) 
                 { 
                     result = await HelpMethod.Get(url, client);
-                    await CheckInv(result, BotID, client, Form);
+                    await CheckInv(result, BotID, client, Form, cancellationToken);
                     HelpMethod.StatusLog($"Выполнили за 15 {i+1} раз(а)", BotID, Form, Resources.thinking);
                     //если стоит флаг менять на 75, то меняем после 5 раз по 15
                     if (change&&i>=4) 
@@ -1139,14 +1196,14 @@ namespace vnebo.mobi.bot.Libs
                 else { HelpMethod.Log($"Нет ссылки для развоза посетителей", BotID, Form); return; }
             }
         }
-        public static async Task BuyPiarMark( int BotID, MainFormAll Form, HttpClient client, string pok)
+        public static async Task BuyPiarMark( int BotID, MainFormAll Form, HttpClient client, string pok, System.Threading.CancellationToken cancellationToken = default)
         {
             string log, url,tek_url;
             
             if (pok == "piar") { tek_url = "vendor/buff/2"; log = "пиар"; } else { tek_url = "vendor/buff/1"; log = "маркетинг"; }
             HelpMethod.StatusLog($"Пытаемся приобрести {log}...", BotID, Form, Resources.man_plus);
             string result = await HelpMethod.Get(tek_url, client);
-            await CheckInv(result, BotID, client, Form);
+            await CheckInv(result, BotID, client, Form, cancellationToken);
             //result= new Regex("<div class=\"nfl\" style=\"text-align:left;\">(.*?)</div>.?</div>.?</div>").Match(result).Groups[1].Value.Replace(" &amp;", "&");
             if (!result.Contains("<span class=\"buff small\">Осталось:")) {
                url = new Regex("<a class=\"tdu\" href=\"(.*?buy4Link.*?)\">").Match(result).Groups[1].Value.Replace("&amp;", "&");
@@ -1165,7 +1222,7 @@ namespace vnebo.mobi.bot.Libs
             /// <param name="BotID">Идентификатор бота (вкладки).</param>
             /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
             /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
-            public static async Task HumanJobs(string hostel_url, int BotID, MainFormAll Form, HttpClient client)
+            public static async Task HumanJobs(string hostel_url, int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             
             // Если ссылка на гостиницу не пустая
@@ -1192,28 +1249,35 @@ namespace vnebo.mobi.bot.Libs
                     {
 
                         HelpMethod.StatusLog("Пытаемся нанять опытных работников...", BotID, Form, Resources.man_plus);
+                        //<a class="tdu" href="https://nebo.mobi/floor/68037603?7348-1.-floorPanel-residents-0-residentPanel-sendToWorkLink">устроить на работу</a>
+                            string url = new Regex("<a class=\"tdu\" href=\"(.*?)\">устроить на ").Match(human.ToString()).Groups[1].Value;
+                            if (url.Length > 0) {
+                            await HelpMethod.Get(url, client);
+                            continue;
 
-                        // Парсим ссылку на жителя
-                        string human_path = new Regex("(/human/[0-9]*.?/[0-9]*.?/[0-9]*.?/[0-9]*.?)\">").Match(human.ToString()).Groups[1].Value;
+                        }
+
+                            // Парсим ссылку на жителя
+                            string human_path = new Regex("href=\"(.*?human/.*?)\">").Match(human.ToString()).Groups[1].Value;
 
                         // Переходим на жителя
                         result = await HelpMethod.Get(human_path, client);
 
                         // Парсим ссылку кнопки "Найти работу"
-                        string find_job_path = new Regex(@"\.\./\.\./\.\./\.\.(.*?)"">Найти").Match(result).Groups[1].Value;
+                        string find_job_path = new Regex("href=\"(.*?)\">Найти").Match(result).Groups[1].Value;
                         string human_level = new Regex("<strong>([0-9])</strong>").Match(result).Groups[1].Value;
 
                         // Переходим на поиск работы
                         result = await HelpMethod.Get(find_job_path, client);
-                        await CheckInv(result, BotID, client, Form);
+                        await CheckInv(result, BotID, client, Form, cancellationToken);
                         // Парсим ссылку кнопки "Устроить на работу"
-                        string get_job_path = new Regex(@"<img src=""/images/icons/sml_happy.png"" alt="""" height=""16"" width=""16""/> <a class=""tdu"" href=""\.\./\.\./\.\./\.\./(.*?)"">устроить на работу").Match(result).Groups[1].Value;
+                        string get_job_path = new Regex(@"href=""(.*?)"">устроить на работу").Match(result).Groups[1].Value;
 
                         // Если есть кнопка "Устроить на работу"
                         if (get_job_path.Length > 0)
                         {
                             // Устраиваем на работу
-                            _ = await HelpMethod.Get(get_job_path, client);
+                            await HelpMethod.Get(get_job_path, client);
 
                             // Прибавляем к количеству найденых работу жителей
                             humans_job_found++;
@@ -1229,7 +1293,7 @@ namespace vnebo.mobi.bot.Libs
                                 if (floor.ToString().Contains("Работа мечты, но мест нет"))
                                 {
                                     // Парсим ссылку на этаж
-                                    string floor_url = new Regex(@"<a class=""flhdr"" href=""\.\./\.\./\.\./\.\.(.*?)"">").Match(result).Groups[1].Value;
+                                    string floor_url = new Regex(@"<a class=""flhdr"" href=""(.*?)"">").Match(result).Groups[1].Value;
 
                                     // Переходим на этаж
                                     result = await HelpMethod.Get(floor_url, client);
@@ -1242,7 +1306,7 @@ namespace vnebo.mobi.bot.Libs
                                     {
                                         // Парсим уровень и ссылку на жителя
                                         string floor_human_level = new Regex(@"<span class=""\w{2}"">([0-9])</span>").Match(floor_human.ToString()).Groups[1].Value;
-                                        string floor_human_path = new Regex(@"<a class=""btn"" href=""\.\./\.\.(.*?)"">").Match(floor_human.ToString()).Groups[1].Value;
+                                        string floor_human_path = new Regex(@"<a class=""btn"" href=""(.*?)"">").Match(floor_human.ToString()).Groups[1].Value;
 
                                         // Если житель не счастливый
                                         if (!floor_human.ToString().Contains("sml_happy"))
@@ -1251,10 +1315,10 @@ namespace vnebo.mobi.bot.Libs
                                             result = await HelpMethod.Get(floor_human_path, client);
 
                                             // Парсим ссылку на увольнение
-                                            string human_dismiss_path = new Regex(@"<a class=""btnw"" href=""\.\./\.\./\.\./\.\./(.*?)"">Уволить</a>").Match(result).Groups[1].Value;
+                                            string human_dismiss_path = new Regex(@"<a class=""btnw"" href=""(.*?)"">Уволить</a>").Match(result).Groups[1].Value;
 
                                             // Пробуем уволить
-                                            result = await HelpMethod.Get($"/{human_dismiss_path}", client);
+                                            result = await HelpMethod.Get($"{human_dismiss_path}", client);
 
                                             // Если уволили
                                             if (result.Contains("Уволена из") || result.Contains("Уволен из"))
@@ -1263,13 +1327,13 @@ namespace vnebo.mobi.bot.Libs
                                                 string floor_dismiss_path = new Regex(@"<a class=""\w{2}"" href=""(.*?)""><span>(.*?)</span></a>").Match(result).Groups[1].Value;
 
                                                 // Переходим на этаж с которого уволили
-                                                result = await HelpMethod.Get($"/{floor_dismiss_path}", client);
+                                                result = await HelpMethod.Get($"{floor_dismiss_path}", client);
 
                                                 // Парсим ссылку на поиск нового работника 
-                                                string floor_id = new Regex(@"<a class=""btn"" href=""\.\./\.\./humans/floor/(.*?)"">").Match(result).Groups[1].Value;
+                                                string floor_id = new Regex(@"<a class=""btn"" href=""(.*?)"">").Match(result).Groups[1].Value;
 
                                                 // Переходим нанимать жителя
-                                                result = await HelpMethod.Get($"/humans/floor/{floor_id}", client);
+                                                result = await HelpMethod.Get($"{floor_id}", client);
 
                                                 // Парсим ссылку кнопки "принять на работу", но если она работа мечты
                                                 string dream_job_path = new Regex(@"<img src=""/images/icons/sml_happy\.png"" alt="""" height=""16"" width=""16""/> <a class=""tdu"" href=""\.\./\.\./(.*?)"">принять на работу</a>").Match(result).Groups[1].Value;
@@ -1300,10 +1364,10 @@ namespace vnebo.mobi.bot.Libs
                                                 result = await HelpMethod.Get(floor_human_path, client);
 
                                                 // Парсим ссылку на увольнение
-                                                string human_dismiss_path = new Regex(@"<a class=""btnw"" href=""\.\./\.\./\.\./\.\./(.*?)"">Уволить</a>").Match(result).Groups[1].Value;
+                                                string human_dismiss_path = new Regex(@"href=""(.*?)"">Уволить").Match(result).Groups[1].Value;
 
                                                 // Пробуем уволить
-                                                result = await HelpMethod.Get($"/{human_dismiss_path}", client);
+                                                result = await HelpMethod.Get($"{human_dismiss_path}", client);
 
                                                 // Если уволили
                                                 if (result.Contains("Уволена из") || result.Contains("Уволен из"))
@@ -1315,16 +1379,16 @@ namespace vnebo.mobi.bot.Libs
                                                     result = await HelpMethod.Get($"/{floor_dismiss_path}", client);
 
                                                     // Парсим ссылку на поиск нового работника 
-                                                    string floor_id = new Regex(@"<a class=""btn"" href=""\.\./\.\./humans/floor/(.*?)"">").Match(result).Groups[1].Value;
+                                                    string floor_id = new Regex(@"<a class=""btn"" href=""(.*?)"">").Match(result).Groups[1].Value;
 
                                                     // Переходим нанимать жителя
-                                                    result = await HelpMethod.Get($"/humans/floor/{floor_id}", client);
+                                                    result = await HelpMethod.Get(floor_id, client);
 
                                                     // Парсим ссылку кнопки "принять на работу", но если она работа мечты
-                                                    string dream_job_path = new Regex(@"<img src=""/images/icons/sml_happy\.png"" alt="""" height=""16"" width=""16""/> <a class=""tdu"" href=""\.\./\.\./(.*?)"">принять на работу</a>").Match(result).Groups[1].Value;
+                                                    string dream_job_path = new Regex(@"src=""/images/icons/sml_happy\.png"" alt="""" height=""16"" width=""16""/> <a class=""tdu"" href=""(.*?)"">принять на работу</a>").Match(result).Groups[1].Value;
 
                                                     // Нанимаем
-                                                    result = await HelpMethod.Get($"/{dream_job_path}", client);
+                                                    result = await HelpMethod.Get($"{dream_job_path}", client);
 
                                                     // Прибавляем к количеству найденых работу жителей
                                                     humans_job_found++;
@@ -1397,7 +1461,7 @@ namespace vnebo.mobi.bot.Libs
                         // Прибавляем общее количество открытых этажей
                         floor_open_count++;
                     }
-                    else { Console.WriteLine(floor_open_url + Result);return; }
+                    else { Logger.WriteError(floor_open_url + Result);return; }
                     if (!MainFormAll.Start[$"{BotID}"]) { return; }
                 }
                 while (Result.Contains("Открыть этаж!"));
@@ -1410,10 +1474,10 @@ namespace vnebo.mobi.bot.Libs
                     i++;
                     if (i > 30) { break; }
                     string floor_open_url = new Regex("<a class=\"tdu\" href=\"(.*?)\">Начать строительство").Match(Result).Groups[1].Value;
-                    if (floor_open_url.Length == 0) { Console.WriteLine(floor_open_url + Result); return; }
+                    if (floor_open_url.Length == 0) { Logger.WriteError(floor_open_url + Result); return; }
                     Result = await HelpMethod.Get($"/{floor_open_url}", client);
                     floor_open_url = new Regex("<a href=\"(.*?floorLink.*?)\" class=").Match(Result).Groups[1].Value;
-                    if (floor_open_url.Length == 0) { Console.WriteLine("2"+floor_open_url + Result); return; }
+                    if (floor_open_url.Length == 0) { Logger.WriteError("2"+floor_open_url + Result); return; }
                     await HelpMethod.Get($"/{floor_open_url}", client);
                     Result = await HelpMethod.Get("/home", client);
                     if (!MainFormAll.Start[$"{BotID}"]) { return; }
@@ -1453,17 +1517,17 @@ namespace vnebo.mobi.bot.Libs
 
         }
 
-        public static async Task OpenNY(int BotID, string url_a, MainFormAll Form, HttpClient client)
+        public static async Task OpenNY(int BotID, string url_a, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Заходим за билетами", BotID, Form, Resources.thinking);
-            string res = await HelpMethod.Get(url_a, client);
+            string res = await HelpMethod.Get(url_a, client, cancellationToken);
             string url;
             string url2;
             do
             {
                 url =  new Regex(@"<a href=""(\?.*?AllLink.*?)"">.*?все</a>").Match(res).Groups[1].Value;
-                //Console.WriteLine($"url={url}");
-                res = await HelpMethod.Get(url, client);
+                //debug url
+                res = await HelpMethod.Get(url, client, cancellationToken);
                 await CheckInv(res, BotID, client, Form);
                 if (!MainFormAll.Start[$"{BotID}"]) { return; }
             } while (res.Contains("все</a>"));
@@ -1474,18 +1538,18 @@ namespace vnebo.mobi.bot.Libs
                 
                 if (url.Length>0&&(item.Groups[2].Value.Equals("Обменять!") || item.Groups[2].Value.Equals("Добавить в очередь") || item.Groups[2].Value.Equals("Забрать!")))
                 {
-                    res=await HelpMethod.Get(url, client);
-                    await CheckInv(res, BotID, client, Form);
+                    res=await HelpMethod.Get(url, client, cancellationToken);
+                    await CheckInv(res, BotID, client, Form, cancellationToken);
                     url2 = url_a + new Regex(@"<a class=""tdu"" href=""[\./]*?(\?.*?product.*?)"">(.*?)</a>").Match(res).Groups[1].Value;
-                    await HelpMethod.Get(url2, client);
-                    //Console.WriteLine($"url2={url2}");
+                    await HelpMethod.Get(url2, client, cancellationToken);
+                    //debug url2
                 }
                 
             }
 
         }
 
-        public static async Task OpenLavka(int BotID, string url, MainFormAll Form, HttpClient client)
+        public static async Task OpenLavka(int BotID, string url, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             
             HelpMethod.StatusLog("Тратим в лавке/огороде", BotID, Form, Resources.thinking);
@@ -1501,8 +1565,8 @@ namespace vnebo.mobi.bot.Libs
             //url =  new Regex(@"<div class="""">\n<a href=""(.*?)"">\n<img class=""logo", RegexOptions.Singleline).Match(res).Groups[1].Value;
 
             url2 = url;
-            //Console.WriteLine($"url2={url2}");
-            string res = await HelpMethod.Get(url, client);
+            //debug url2
+            string res = await HelpMethod.Get(url, client, cancellationToken);
             int i = 0;
             do
             {
@@ -1513,28 +1577,28 @@ namespace vnebo.mobi.bot.Libs
                 if (matches.Length > 0)
                 {
                     num = rnd.Next(0, matches.Length);
-                    res = await HelpMethod.Get(matches[num].Groups[1].Value, client);
+                    res = await HelpMethod.Get(matches[num].Groups[1].Value, client, cancellationToken);
                 }
                 if (res.Contains("Установить"))
                 {
                     url = new Regex("<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">Установить</a>").Match(res).Groups[1].Value;
-                    await HelpMethod.Get(url, client);
-                    res = await HelpMethod.Get(url2, client);
+                    await HelpMethod.Get(url, client, cancellationToken);
+                    res = await HelpMethod.Get(url2, client, cancellationToken);
                 }
                 if (res.Contains("улучшить"))
                 {
                     url = new Regex("<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">улучшить</a>").Match(res).Groups[1].Value;
-                    res = await HelpMethod.Get(url, client);
+                    res = await HelpMethod.Get(url, client, cancellationToken);
                 }
                 if (res.Contains("Продолжить"))
                 {
                     url = new Regex("<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">Продолжить</a>").Match(res).Groups[1].Value;
-                    res = await HelpMethod.Get(url, client);
+                    res = await HelpMethod.Get(url, client, cancellationToken);
                 }
                 if (res.Contains("Следующая задача"))
                 {
                     url = new Regex("<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">Следующая задача</a>").Match(res).Groups[1].Value;
-                    res = await HelpMethod.Get(url, client);
+                    res = await HelpMethod.Get(url, client, cancellationToken);
                 }
                 cena = new Regex(@"за .*?/>(\d+)\s").Match(res).Groups[1].Value.Replace("&#039;","").Replace("'","");
                 if (HelpMethod.ToInt(cena) == 0) { HelpMethod.StatusLog("нет цены!", BotID, Form, Resources.thinking); break; }
@@ -1547,22 +1611,22 @@ namespace vnebo.mobi.bot.Libs
                 if (!MainFormAll.Start[$"{BotID}"]) { return; }
             } while (HelpMethod.ToInt(kol)/HelpMethod.ToInt(cena)>=1&&i<40);
             url = new Regex("href=\"(tower/id/[0-9]*.?)\"><span>").Match(res).Groups[1].Value;
-            res = await HelpMethod.Get(url, client);
+                    res = await HelpMethod.Get(url, client, cancellationToken);
             if (res.Contains("Улучшить"))
             {
                 url = new Regex("<a class=\".{0,40}btng.{0,40}\" href=\"(.*?)\">Улучшить</a>").Match(res).Groups[1].Value;
-                await HelpMethod.Get(url, client);
+                await HelpMethod.Get(url, client, cancellationToken);
             }
 
         }
-        public static async Task GoThree(string url, int BotID, MainFormAll Form, HttpClient client) 
+        public static async Task GoThree(string url, int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default) 
         {
             if (url.Length > 0)
             {
                 HelpMethod.StatusLog("Выселяем жителей >3 должности...", BotID, Form, Resources.man_minus);
 
                 // Заходим в гостиницу
-                string result = await HelpMethod.Get(url, client);
+                string result = await HelpMethod.Get(url, client, cancellationToken);
 
                 // Раскрываем список жителей в гостинице, если это нужно
                 if (result.Contains("Раскрыть список"))
@@ -1573,7 +1637,7 @@ namespace vnebo.mobi.bot.Libs
                     // Проверяем то что ссылка не пустая и раскрываем список
                     if (expandResidentsLink.Length > 0)
                     {
-                        result = await HelpMethod.Get(expandResidentsLink, client);
+                        result = await HelpMethod.Get(expandResidentsLink, client, cancellationToken);
                     }
                 }
 
@@ -1595,7 +1659,7 @@ namespace vnebo.mobi.bot.Libs
                         string dolg = new Regex(@"<span class=""\D\D"">(\D*?)</span>").Match(li).Groups[1].Value;
                         // Парсим ссылку на жителя
                         string human_url = new Regex("href=\"(.*?/human/[0-9]*.*?)\">").Match(li).Groups[1].Value;
-                        //Console.WriteLine("key = {1} Value = {0}", dolg, human_url);
+                            //debug: key = {1} Value = {0}
                         hum.Add(human_url,dolg);
                     } //конец цикла
                     string pred = "";
@@ -1632,21 +1696,21 @@ namespace vnebo.mobi.bot.Libs
                     // Проверяем то что ссылка не пустая и сворачиваем список
                     if (expandResidentsLink.Length > 0)
                     {
-                        await HelpMethod.Get(expandResidentsLink, client);
+                        await HelpMethod.Get(expandResidentsLink, client, cancellationToken);
                     }
                 }
             } //если не пустая ссылка
         }
         //позвать посетителей
-        public static async Task GetLift(int BotID, MainFormAll Form, HttpClient client, int ot)
+        public static async Task GetLift(int BotID, MainFormAll Form, HttpClient client, int ot, System.Threading.CancellationToken cancellationToken = default)
         {
             //развезём имеющихся
-            await Lift(BotID, Form, client, ot);
+            await Lift(BotID, Form, client, ot, cancellationToken);
             HelpMethod.StatusLog("Зовем посетителей", BotID, Form, Resources.thinking);
-            string result = await HelpMethod.Get("/lift", client);
+            string result = await HelpMethod.Get("/lift", client, cancellationToken);
             string url = new Regex("href=\"(.*?activateLiftLink.*?)\">").Match(result).Groups[1].Value;
             //если правильно распарсили, зовем за 2 бакса
-            if (url.Length > 0) { await HelpMethod.Get(url,client); HelpMethod.Log("Позвали в лифт ",BotID,Form); }
+            if (url.Length > 0) { await HelpMethod.Get(url, client, cancellationToken); HelpMethod.Log("Позвали в лифт ", BotID, Form); }
 
         }
         //открыть 10-ю дверь
@@ -1677,13 +1741,13 @@ namespace vnebo.mobi.bot.Libs
         {
             
             HelpMethod.StatusLog("Пополняем бюджет", BotID, Form, Resources.thinking);
-            string result = await HelpMethod.Get("/city", client);
-            string url = new Regex("<a class=\"link\" href=\"(city/storage/0/.*?)\"><img width=\"16\" height=\"16\" src=\"/images/icons/bank.png").Match(result).Groups[1].Value;
+            string result = await HelpMethod.Get("/wicket/bookmarkable/ru.overmobile.towers.wicket.pages.guild.GuildPage", client);
+            string url = new Regex("<a class=\"link\" href=\"(.*?)\"><img width=\"16\" height=\"16\" src=\"/images/icons/bank.png").Match(result).Groups[1].Value;
             result= await HelpMethod.Get(url, client);
             url = new Regex("<form action=\"(.*?)\"").Match(result).Groups[1].Value;
             if (url.Length > 0)
             {
-                string id = new Regex("name=\":submit\" id=\"(.*?)\" value=\"Пополнить бюджет\"").Match(result).Groups[1].Value;
+                string id = new Regex("id=\"(id.*?)\" value=\"Пополнить бюджет\"").Match(result).Groups[1].Value;
                 // Генерируем POST запрос
                 Dictionary<string, string> parameters = new Dictionary<string, string>
                 {
@@ -1730,17 +1794,18 @@ namespace vnebo.mobi.bot.Libs
                 int coin = 0;
                 string other = "";
                 int miniPriz = 0;
-                string alg = "";
+            string url;
                 do
                 {
                 
                 kolKey++;
                     //случайно определяем в какую дверь входить
                     door = rnd.Next(1, 4);
-                alg += door.ToString()+",";
+
                 // Парсим ссылку для случайной двери
                 // href = "./doors?0-1.-doorLink1&action=1783530840401" href="./doors?0-1.-doorLink2&action=1783530840401"
-                string url = new Regex("<a href=\"(.{30,40}doorLink" + door + ".*?)\">").Match(result).Groups[1].Value.Replace("&amp;", "&");
+                 url = new Regex("<a href=\"(.{30,60}doorLink" + door + ".*?)\">").Match(result).Groups[1].Value.Replace("&amp;", "&");
+                if (url.Length == 0) { HelpMethod.Log($"Пустая ссылка {url} {door} на лаб! ", BotID, Form); return; }
                     // определяем в какой мы комнате
                     room = new Regex("Комната: <b class=\"amount\">(.*?)</b>").Match(result).Groups[1].Value;
                     // обновляем статус
@@ -1761,10 +1826,10 @@ namespace vnebo.mobi.bot.Libs
                     }
                         if (result.Contains("Начать сначала"))
                         {
-                        alg = "";
+
                             HelpMethod.StatusLog(" Тупик в " + room + " комнате :(", BotID, Form);
                             result = await HelpMethod.Get("/doors", client);
-                        HelpMethod.Log($"Тупик в комнате:{room}. Осталось ключей: {ost}. Мини-приз: {HelpMethod.StringNumberFormat(miniPriz.ToString(),true)} монет", BotID, Form);
+                        //HelpMethod.Log($"Тупик в комнате:{room}. Осталось ключей: {ost}. Мини-приз: {HelpMethod.StringNumberFormat(miniPriz.ToString(),true)} монет", BotID, Form);
                     }
                         ost = new Regex("Осталось ключей:.*<span>(.*?)</span>").Match(result).Groups[1].Value;
                         room = new Regex("Комната: <b class=\"amount\">(.*?)</b>").Match(result).Groups[1].Value;
@@ -1781,7 +1846,7 @@ namespace vnebo.mobi.bot.Libs
                     if (kolKey==100) { HelpMethod.Log("Потратили " + kolKey + " ключей и не дошли, прерываем", BotID, Form); break; }
                     if (!MainFormAll.Start[$"{BotID}"]) { return; }
                 }
-                } while (!ost.Equals("0")); //пока есть хоть один ключ
+                } while (!ost.Equals("0")&& url.Length > 0); //пока есть хоть один ключ
 
                 HelpMethod.Log("Потратили " + kolKey + " ключей", BotID, Form);
                 HelpMethod.Log("Дошли до " + room + " двери", BotID, Form);
@@ -1953,26 +2018,26 @@ namespace vnebo.mobi.bot.Libs
                 }
             }
         }
-        public static async Task Build(int BotID, MainFormAll Form, HttpClient client) {
+        public static async Task Build(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default) {
             string url = "/home";
             
-            string result = await HelpMethod.Get(url,client);
+            string result = await HelpMethod.Get(url,client, cancellationToken);
             HelpMethod.StatusLog("Строим этаж!", BotID, Form);
             url = new Regex("<a class=\"tdu\" href=\"(.*?buyNewFloorPanel.*?)\">").Match(result).Groups[1].Value;
             if (url.Length > 0)
             {
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
             } else { HelpMethod.Log("Нет денег на этаж!", BotID, Form); return; }
             url = new Regex("<a class=\"btng cnfrm\" href=\"(.*?confirmLink.*?)\">Да").Match(result).Groups[1].Value;
             if (url.Length > 0)
             {
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
             }
 
             url = new Regex("<a href=\"(.*?floorLink.*?)\" class=").Match(result).Groups[1].Value;
             if (url.Length > 0)
             {
-                await HelpMethod.Get(url, client);
+                await HelpMethod.Get(url, client, cancellationToken);
                 HelpMethod.Log("Построили этаж!",BotID,Form);
             }
        }
@@ -2034,7 +2099,7 @@ namespace vnebo.mobi.bot.Libs
             /// <param name="HttpClient">Экземпляр <see cref="HttpClient"/>.</param>
             /// <param name="Form">Экземпляр <see cref="MainFormAll"/>.</param>
             /// <returns></returns>
-            public static async Task AutumnMarathon(int BotID, MainFormAll Form, HttpClient client)
+            public static async Task AutumnMarathon(int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             // Переходим на страницу марафона
             string result = await HelpMethod.Get("/tasks", client);
@@ -2045,15 +2110,17 @@ namespace vnebo.mobi.bot.Libs
                 HelpMethod.Log("Получили награду за марафон" ,BotID,Form);
             }
         }
-        public static async Task AwayCity(int BotID, MainFormAll Form, IniFiles settings)
+        public static async Task AwayCity(int BotID, MainFormAll Form, IniFiles settings, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Выходим с города...", BotID, Form);
 
             Dictionary<string, string> account_settings = settings.GetSett($"USER_{BotID}");
 
             HttpClient client = HelpMethod.HttpManager(account_settings["LOGIN"]);
-            client.BaseAddress = new Uri("https://" + account_settings["SERVER"]);
-            
+           if (!string.IsNullOrEmpty(account_settings["LOGIN"]) && HelpMethod._httpClients.TryGetValue(account_settings["LOGIN"], out var existingClient))
+            { 
+                client.BaseAddress = new Uri("https://" + account_settings["SERVER"]);
+            }
             string url = "/home";
             string result = await HelpMethod.Get(url, client);
             if (result.Contains("Начни играть!"))
@@ -2072,7 +2139,7 @@ namespace vnebo.mobi.bot.Libs
             HelpMethod.StatusLog("", BotID, Form);
         }
 
-            public static async Task Away(String Command, int BotID, MainFormAll Form, HttpClient client)
+            public static async Task Away(String Command, int BotID, MainFormAll Form, HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             HelpMethod.StatusLog("Выселяем жителей...", BotID, Form, Resources.man_minus);
 
@@ -2133,15 +2200,15 @@ namespace vnebo.mobi.bot.Libs
                     if(Command.Contains("кроме")) { usl = !usl; }
                     if (usl)
                     {
-                        
+
                         url = new Regex("<a href=\"(.*?)\" class=\"white\">").Match(match.Groups[1].Value).Groups[1].Value;
                         if (url.Length > 0)
                         {
-                            string res = await HelpMethod.Get(url, client);
-                            url = new Regex("<a class=\"btnr\" href=\"(.*?)\">Выселить</a>").Match(res).Groups[1].Value;
+                            string resInner = await HelpMethod.Get(url, client, cancellationToken);
+                            url = new Regex("<a class=\"btnr\" href=\"(.*?)\">Выселить</a>").Match(resInner).Groups[1].Value;
                             if (url.Length > 0)
                             {
-                                await HelpMethod.Get(url, client);
+                                await HelpMethod.Get(url, client, cancellationToken);
                                 kol_tek++;
                                 HelpMethod.StatusLog("Выселили " + kol_tek.ToString(), BotID, Form, Resources.man_minus);
                                 if (!MainFormAll.Start[$"{BotID}"]) { return; }
@@ -2198,7 +2265,7 @@ namespace vnebo.mobi.bot.Libs
             await HelpMethod.Get(url, client);
         }
 
-        public static async Task<string> SendMsg(MainFormAll Form, int BotID, HttpClient client, string id)
+        public static async Task<string> SendMsg(MainFormAll Form, int BotID, HttpClient client, string id, System.Threading.CancellationToken cancellationToken = default)
         {
             
             string url;
@@ -2210,7 +2277,7 @@ namespace vnebo.mobi.bot.Libs
             await SetNoVis(client, inv);
 
             url = "/home";
-            result = await HelpMethod.Get(url, client);
+            result = await HelpMethod.Get(url, client, cancellationToken);
             if (result.Contains("Вас приглашают в город"))
             {
                 if (!inv)
@@ -2254,9 +2321,9 @@ namespace vnebo.mobi.bot.Libs
                 i++;
                 if (i > 10) { break; }
                 HelpMethod.StatusLog("Ждем ответа "+i.ToString(), BotID, Form);
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
                 await HelpMethod.RandomDelay(1000,2000);
-                if (!MainFormAll.Start[$"{BotID}"]) { return "" ; }
+                if (cancellationToken.IsCancellationRequested || !MainFormAll.Start[$"{BotID}"]) { return "" ; }
             }
             while (!result.Contains("принять"));
             if (i <= 10)
@@ -2272,7 +2339,7 @@ namespace vnebo.mobi.bot.Libs
             return "Нет мест";
 
         }
-        public static async Task<string> Create(MainFormAll Form, IniFiles settings, int BotID, List<int> arrUser, int sex)
+        public static async Task<string> Create(MainFormAll Form, IniFiles settings, int BotID, List<int> arrUser, int sex, System.Threading.CancellationToken cancellationToken = default)
         {
             string Sections = "";
             HttpClient client = HelpMethod.HttpManager();
@@ -2280,16 +2347,16 @@ namespace vnebo.mobi.bot.Libs
             int i = 0;
             string url = "/start";
             HelpMethod.StatusLog("Создаем нового перса...", BotID, Form, Resources.update);
-            string result = await HelpMethod.Get(url, client);
+            string result = await HelpMethod.Get(url, client, cancellationToken);
 
             do
             {
                 HelpMethod.StatusLog("Собираю выручку...", BotID, Form, Resources.update);
                 url = new Regex("<a class=\"tdu\" href=\"(.*?floorPanel.*?)\">Собрать выручку!").Match(result).Groups[1].Value;
-                await HelpMethod.Get(url, client);
+                await HelpMethod.Get(url, client, cancellationToken);
 
                 url = "/home";
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
                 if (!MainFormAll.Start[$"{BotID}"]) { return ""; }
             } while (result.Contains("Собрать выручку"));
 
@@ -2297,13 +2364,13 @@ namespace vnebo.mobi.bot.Libs
             {
                 HelpMethod.StatusLog("Закупаю товар...", BotID, Form, Resources.update);
                 url = new Regex("<a class=\"tdu\" href=\"(floor.*?)\">Закупить товар").Match(result).Groups[1].Value;
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
 
                 url = new Regex("<a class=\"tdu\" href=\"(.*?)\">").Match(result).Groups[1].Value;
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
 
                 url = "/home";
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
                 if (!MainFormAll.Start[$"{BotID}"]) { return""; }
             } while (result.Contains("Закупить товар"));
 
@@ -2311,7 +2378,7 @@ namespace vnebo.mobi.bot.Libs
             {
                 HelpMethod.StatusLog("Катаю лифт...", BotID, Form, Resources.update);
                 url = "/lift";
-                result = await HelpMethod.Get(url, client);
+                result = await HelpMethod.Get(url, client, cancellationToken);
 
                 url = new Regex("<a class=\"tdu\" href=\"(.*?)\">Поднять лифт").Match(result).Groups[1].Value;
                 if (url.Length > 0)
@@ -2373,7 +2440,7 @@ namespace vnebo.mobi.bot.Libs
                     result = await HelpMethod.Post(url,parameters,client);
                     if (!MainFormAll.Start[$"{BotID}"]) { return""; }
                 }
-                    catch (Exception ex) { Console.WriteLine("ex POST save = " + ex); }
+                    catch (Exception ex) { Logger.Write("ex POST save = " + ex); }
                 } while (result.Contains("уже занято"));
 
             HelpMethod.StatusLog("Прячусь от городов...", BotID, Form, Resources.update);
@@ -2387,11 +2454,11 @@ namespace vnebo.mobi.bot.Libs
         }
 
 
-        public static async Task<string> GetLogin(int sex)
+        public static async Task<string> GetLogin(int sex, System.Threading.CancellationToken cancellationToken = default)
         {
             HttpClient client = HelpMethod.HttpManager();
             string url = "https://ciox.ru/nickname-generator";
-            await HelpMethod.Get(url, client);
+            await HelpMethod.Get(url, client, cancellationToken);
 
             Dictionary<string, string> parameters = new Dictionary<string, string>
                 {
@@ -2405,7 +2472,7 @@ namespace vnebo.mobi.bot.Libs
             {
                 result = await HelpMethod.Post(url, parameters, client);
             }
-            catch(Exception ex) { Console.WriteLine("ex POST = " + ex); }
+            catch(Exception ex) { Logger.Write("ex POST = " + ex); }
            
             return new Regex("input_c result\">(.*?)<").Match(result).Groups[1].Value;
         }
@@ -2519,7 +2586,7 @@ namespace vnebo.mobi.bot.Libs
                 string action = new Regex("/action\">(.*?)</a>").Match(result_home).Groups[1].Value;
                 //                Match lobby = new Regex("<div class=\"nfl\">.*?<strong class=\"admin\">.*?<div class=\"white\">(.*?)</div>.*?Прогресс:.*?<span><span>(.*?)</span>.*?<span>(.*?)</span>", RegexOptions.Singleline | RegexOptions.Multiline).Match(result_lobby);
 
-                string mail = new Regex("a href=\"(mail)\"><img").Match(result_home).Groups[1].Value;
+                string mail = new Regex("href=\"(.{0,60}/mail)\"").Match(result_home).Groups[1].Value;
                 string manager= new Regex("<a class=\"tdn\" href=\"vendor/buff/0/[0-9].*?buff\">Менеджер: (.*?)</span>", RegexOptions.Singleline | RegexOptions.Multiline).Match(result_home).Groups[1].Value;
                 manager = manager.Replace("<span ","<");
                 PM += manager;
@@ -2570,7 +2637,7 @@ namespace vnebo.mobi.bot.Libs
                         tabPage.ImageIndex = Form.imageList1.Images.IndexOfKey("letters"); tabPage.ToolTipText = txt;
                         /*tabPage.MouseWheel += (s, e) =>
                         {
-                            Console.WriteLine(tabPage.Text);
+                            Logger.Write(tabPage.Text);
                             MsgForm msgForm = new MsgForm(BotID, client);
                             msgForm.ShowDialog();
 
@@ -2643,7 +2710,7 @@ namespace vnebo.mobi.bot.Libs
                         TQ += tmp;
                     }
                         page = page.Replace("%TQ%", "" + TQ);
-                        try
+                    try
                     {
                         WebBrowser info = FindControl.FindWebBrouser("Info", BotID, Form);
                         info.IsWebBrowserContextMenuEnabled = false;
@@ -2652,7 +2719,7 @@ namespace vnebo.mobi.bot.Libs
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine("stat "+ex);
+                        Logger.Write("stat "+ex);
                         HelpMethod.Log("Ошибка вывода статистики "+ex, BotID, Form);
                         return;
                     }
@@ -2660,45 +2727,43 @@ namespace vnebo.mobi.bot.Libs
                 });
 
                 HelpMethod.StatusLog("Обновили статистику", BotID, Form, Resources.update);
-            } catch(Exception ex) { Console.WriteLine("stat end " + ex); HelpMethod.Log("Ошибка сбора статистики " + ex, BotID, Form); return; }
+            } catch(Exception ex) { Logger.Write("stat end " + ex); HelpMethod.Log("Ошибка сбора статистики " + ex, BotID, Form); return; }
         }
 
-        public static async Task<string> CheckMail(HttpClient client, bool read, bool all=false )
+        public static async Task<string> CheckMail(HttpClient client, bool read, bool all = false, System.Threading.CancellationToken cancellationToken = default)
         {
             //HelpMethod.StatusLog("Проверяем почту", BotID, Form);
-            string res = await HelpMethod.Get("/mail", client);
-            string url= new Regex(@"<a class=""ptd"" href=""(.+?modeNew.+?)""><img").Match(res).Groups[1].Value;
+            string res = await HelpMethod.Get("/mail", client, cancellationToken);
+            string url = new Regex(@"<a class=""ptd"" href=""(.+?modeNew.+?)""><img").Match(res).Groups[1].Value;
             string txt = "";
-            if(!all)
-            res = await HelpMethod.Get("/mail"+url, client);
+            if (!all)
+                res = await HelpMethod.Get("/mail" + url, client, cancellationToken);
             if (read)
             {
-                foreach (Match match in Regex.Matches(res, @"<span class=""admin"">Игра</span>.+?link"" href=""(mail/read/id/\d+)"">.*?<span>(.+?)</span>", RegexOptions.Multiline | RegexOptions.Singleline))
+                foreach (Match match in Regex.Matches(res, @"<span class=""admin"">Игра</span>.+?href=""(.{0,60}mail/read/id/\d+)"">", RegexOptions.Multiline | RegexOptions.Singleline))
                 {
-                    await HelpMethod.Get(match.Groups[1].Value, client);
+                    await HelpMethod.Get(match.Groups[1].Value, client, cancellationToken);
                 }
-                
             }
-            else
-            {
+           
                 string newall = "tdn link";
                 if (all) newall = ".*?";
                 /*TextWriter tw2 = new StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "msg_.html");
                 tw2.Write(res);
                 tw2.Close();
-                Console.WriteLine(newall);*/
-                foreach (Match match in Regex.Matches(res, $@"<a href=""tower/id/\d+""><span>(.+?)</span></a>.+?<a class=""{newall}"" href=""mail/read/id/\d+""><span>(.+?)</span></a>", RegexOptions.Multiline | RegexOptions.Singleline))
+                //debug: newall*/
+                foreach (Match match in Regex.Matches(res, @"<a href="".{10,60}tower/id/\d+""><span>(.+?)</span></a>.+?<a class=""tdn link"" href="".{10,60}mail/read/id/\d+""><span>(.+?)</span>", RegexOptions.Multiline | RegexOptions.Singleline))
                 {
                     txt += match.Groups[1].Value + ": " + match.Groups[2].Value + "\n";
                 }
-            }
+            
             return txt;
         }
 
-        public static async Task<string> ReadMail(HttpClient client)
+        public static async Task<string> ReadMail(HttpClient client, System.Threading.CancellationToken cancellationToken = default)
         {
             //HelpMethod.StatusLog("Проверяем почту", BotID, Form);
-            string res = await HelpMethod.Get("/mail", client);
+            string res = await HelpMethod.Get("/mail", client, cancellationToken);
             string txt = "";
 
             /*TextWriter tw2 = new StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "msg_.html");

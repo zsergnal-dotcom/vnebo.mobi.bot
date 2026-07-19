@@ -21,7 +21,12 @@ namespace vnebo.mobi.bot
             };
 
             HttpClient client = HelpMethod.HttpManager(accountSettings["LOGIN"], handler);
-            client.BaseAddress = new Uri("https://" + accountSettings["SERVER"]);
+
+            try
+            {
+                client.BaseAddress = new Uri("https://" + accountSettings["SERVER"]);
+            }
+            catch (Exception ) { }
             return client;
         }
 

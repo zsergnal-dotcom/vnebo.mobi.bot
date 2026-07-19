@@ -17,11 +17,13 @@ namespace vnebo.mobi.bot
             AllowAutoRedirect = true,
             UseCookies = true
         };
-        public static HttpClient client = HelpMethod.HttpManager("tmp",hand);
+        public static HttpClient client = HelpMethod.HttpManager("tmp", hand);
         public Web(Dictionary<string, string> account_settings, string Auth = "")
         {
+
             InitializeComponent();
-            client = HelpMethod.HttpManager(account_settings["LOGIN"], hand);
+              //HttpClient client = HelpMethod.HttpManager(account_settings["LOGIN"], hand);
+        client = HelpMethod.HttpManager(account_settings["LOGIN"], hand);
             client.BaseAddress = new Uri("https://" + account_settings["SERVER"]);
             
             Task.Run(async () =>
@@ -85,7 +87,7 @@ namespace vnebo.mobi.bot
                 {
                     baseUrl = baseUrl.Substring(0, baseUrl.LastIndexOf("/", StringComparison.Ordinal));
                     baseUrl = HttpUtility.UrlDecode(baseUrl);
-                    //Console.WriteLine("tek str" + HelpMethod.GetEndURI(new Uri (url),client).ToString());
+                    //debug tek str
                     //result = result.Replace("../../", client.BaseAddress.ToString());
                     result = result.Replace("\"./", "\"" + baseUrl + "/");
                 }

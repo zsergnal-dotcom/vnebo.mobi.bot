@@ -21,12 +21,13 @@ namespace vnebo.mobi.bot
             Task.Run(async () =>
             {
                 string txt = await BotEngine.ReadMail(client);
+                // ReadMail has an optional CancellationToken parameter; calling it without a token is valid.
                 Invoke((MethodInvoker)delegate
                 {
                     foreach (string str in txt.Split(new string[] { "#\n" }, StringSplitOptions.None))
                     {
                         listBox1.Items.Add(str);
-                        Console.WriteLine($"txt={str}");
+                        Logger.Write($"txt={str}");
                     }
                 });
             });
